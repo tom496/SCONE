@@ -52,8 +52,21 @@ contains
     DTLoop:do
       distance = -log( p% pRNG % get() ) * majorant_inv
 
+      if (p % timeMax > ZERO .and. p % time + distance / p % getSpeed() > p % timeMax) then
+        distance = distance * (p % timeMax - p % time)/(distance / p % getSpeed())
+        p % fate = AGED_FATE
+        !print *, '  -Particle time before aged fate:', numToChar(p%time)
+        p % time = p % timeMax
+        ! Move partice in the geometry
+        call self % geom % teleport(p % coords, distance)
+        return
+      endif
+
       ! Move partice in the geometry
       call self % geom % teleport(p % coords, distance)
+
+      ! Update time
+      p % time = p % time + distance / p % getSpeed()
 
       ! If particle has leaked exit
       if (p % matIdx() == OUTSIDE_FILL) then

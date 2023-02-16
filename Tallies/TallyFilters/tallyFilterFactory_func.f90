@@ -10,6 +10,7 @@ module tallyFilterFactory_func
   ! tallyFilter implementations
   use energyFilter_class,   only : energyFilter
   use testFilter_class,     only : testFilter
+  use timeFilter_class,     only : timeFilter
 
 
   implicit none
@@ -22,7 +23,8 @@ module tallyFilterFactory_func
   ! It is printed if type was unrecognised
   ! NOTE:
   ! For now  it is necessary to adjust trailing blanks so all enteries have the same length
-  character(nameLen),dimension(*),parameter :: AVALIBLE_tallyFilters = [ 'energyFilter']
+  character(nameLen),dimension(*),parameter :: AVALIBLE_tallyFilters = [ 'energyFilter',&
+                                                                         'timeFilter  ']
 
 contains
 
@@ -52,6 +54,10 @@ contains
       case('testFilter')
         allocate(testFilter :: new)
         call new % init(dict)
+
+     case('timeFilter')
+       allocate(timeFilter :: new)
+       call new % init(dict)
 
      !*** NEW TALLY MAP TEMPLATE ***!
      !case('<newtallyFilterName>')

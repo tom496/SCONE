@@ -4,6 +4,7 @@ add_sources( ./tallyFilter_inter.f90
              ./tallyFilterFactory_func.f90
              ./testFilter_class.f90
              ./energyFilter_class.f90
+             ./timeFilter_class.f90
              )
              
 add_unit_tests(./Tests/energyFilter_test.f90

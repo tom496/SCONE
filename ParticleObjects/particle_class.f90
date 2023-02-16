@@ -112,7 +112,7 @@ module particle_class
     ! Particle processing information
     class(RNG), pointer        :: pRNG  => null()  ! Pointer to RNG associated with the particle
     real(defReal)              :: k_eff            ! Value of default keff for implicit source generation
-    integer(shortInt)          :: geomIdx          ! Index of the geometry used by the particle 
+    integer(shortInt)          :: geomIdx          ! Index of the geometry used by the particle
 
     ! Archived snapshots of previous states
     type(particleState)        :: preHistory
@@ -135,6 +135,7 @@ module particle_class
     procedure                  :: getUniIdx
     procedure                  :: matIdx
     procedure, non_overridable :: getType
+    procedure                  :: getSpeed
 
     ! Operations on coordinates
     procedure            :: moveGlobal
@@ -187,6 +188,7 @@ contains
     real(defReal),intent(in)                :: w
     real(defReal),optional,intent(in)       :: t
     integer(shortInt),intent(in),optional   :: type
+
 
     call self % coords % init(r, dir)
     self % E  = E
@@ -420,6 +422,30 @@ contains
     end if
 
   end function getType
+
+  !!
+  !! Return speed of the particle
+  !!
+  !! Args:
+  !!   None
+  !!
+  !! Result:
+  !!   Speed of light for photon, speed from E for neutron
+  !!
+  !! Errors:
+  !!   Will not work with MG
+  !!
+  pure function getSpeed(self) result(speed)
+    class(particle), intent(in) :: self
+    real(defReal)               :: speed
+
+    if (self % type == P_PHOTON) then
+      speed = lightSpeed
+    else
+      speed = sqrt(self % E * TWO/neutronMass) * lightSpeed
+    end if
+
+  end function getSpeed
 
 !!<><><><><><><>><><><><><><><><><><><>><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
 !! Particle operations on coordinates procedures

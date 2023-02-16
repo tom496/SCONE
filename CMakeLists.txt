@@ -138,6 +138,10 @@ endif()
 add_executable(scone.out ./Apps/scone.f90 )
 target_link_libraries(scone.out scone )
 
+# TEST PROGRAMS
+add_executable(particle_speed_test.out ./Apps/particle_speed_test.f90 )
+target_link_libraries(particle_speed_test.out scone )
+
 ####################################################################################################
 # COMPILE UNIT TESTS
 if(BUILD_TESTS)

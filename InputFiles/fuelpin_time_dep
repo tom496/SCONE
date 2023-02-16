@@ -1,0 +1,113 @@
+type timeDependentPhysicsPackage;
+
+pop      1000;
+timeSteps 10;
+XSdata ce;
+dataType ce;
+timeStepLength 1.E-06;
+buffer 10000;
+
+// Specify output format default asciiMATLAB
+//outputFormat asciiJSON;
+
+collisionOperator { neutronCE {type neutronCEimp; impGen 0;}}
+
+transportOperator {type transportOperatorDT;
+                   }
+
+source {
+  type pointSource;
+  r (0 0 0);
+  particle neutron;
+  E 2.0;
+}
+
+tally  {
+  flux_short { type collisionClerk;
+    map { type energyMap; grid log; min 0.000000001; max 5; N 300;}
+    response (flux); flux {type fluxResponse;} filter {type timeFilter; Tmin 0.0; Tmax 0.00001;}
+  }
+  flux_long { type collisionClerk;
+    map { type energyMap; grid log; min 0.000000001; max 5; N 300;}
+    response (flux); flux {type fluxResponse;} filter {type timeFilter; Tmin 0.00001; Tmax 300.0;}
+  }
+  flux_total { type collisionClerk;
+    map { type energyMap; grid log; min 0.000000001; max 5; N 300;}
+    response (flux); flux {type fluxResponse;}
+  }
+}
+
+
+geometry {
+  type geometryStd;
+  boundary ( 2 2 2 2 0 0);
+  graph {type shrunk;}
+
+  surfaces {
+    squareBound { id 1; type zSquareCylinder; origin (0.0 0.0 0.0); halfwidth (0.63 0.63 0.0);}
+  }
+
+  cells {
+   // in  {id 1; surfaces ( -1); filltype uni; universe 401;}
+   // out {id 2; surfaces (1); filltype outside; }
+  }
+
+  universes {
+    root { id 1; type rootUniverse; border 1; fill u<31>; }
+
+    // Pin universes
+    pin31 { id 31; type pinUniverse; radii (0.412 0.4750 0.0 );
+                                     fills (uo2  clad water);}
+
+
+}
+}
+
+viz {
+  bmp {
+    type bmp;
+    output img;
+    what material;
+    centre (0.0 0.0 0.0);
+    //width (25.0 25.0);
+    axis z;
+    res (500 500);
+  }
+}
+
+
+nuclearData {
+  handles {
+    ce {type aceNeutronDatabase; aceLibrary /home/tom13/myACE/JEF311.aceXS;}
+  }
+  materials {
+
+    water {
+      temp 75675;
+      composition {
+      1001.03    6.700E-002;
+      8016.03    3.350E-002;
+      5010.03    5.560E-006;
+      5011.03    2.224E-005; }
+      }
+
+     clad {
+       temp 12345;
+       composition {
+       40090.03  2.21235E-002;
+       40091.03  4.82460E-003;
+       40092.03  7.37450E-003;
+       40094.03  7.47340E-003;
+       40096.03  1.20400E-003;}
+       }
+
+    uo2 {
+      temp 87476;
+       composition {
+      92235.03  9.3472E-04;
+      92238.03  2.1523E-002;
+       8016.03  4.49E-002; }
+      }
+
+}
+}

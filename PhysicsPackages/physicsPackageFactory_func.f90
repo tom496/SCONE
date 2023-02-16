@@ -11,10 +11,11 @@ module physicsPackageFactory_func
   use physicsPackage_inter,            only : physicsPackage
 
   ! Implementations
-  use eigenPhysicsPackage_class,       only : eigenPhysicsPackage
-  use fixedSourcePhysicsPackage_class, only : fixedSourcePhysicsPackage
-  use vizPhysicsPackage_class,         only : vizPhysicsPackage
-  use rayVolPhysicsPackage_class,      only : rayVolPhysicsPackage
+  use eigenPhysicsPackage_class,         only : eigenPhysicsPackage
+  use fixedSourcePhysicsPackage_class,   only : fixedSourcePhysicsPackage
+  use vizPhysicsPackage_class,           only : vizPhysicsPackage
+  use rayVolPhysicsPackage_class,        only : rayVolPhysicsPackage
+  use timeDependentPhysicsPackage_class, only : timeDependentPhysicsPackage
 !  use dynamPhysicsPackage_class, only : dynamPhysicsPackage
 
   implicit none
@@ -25,10 +26,11 @@ module physicsPackageFactory_func
   ! It is printed if type was unrecognised
   ! NOTE:
   ! For now  it is necessary to adjust trailing blanks so all enteries have the same length
-  character(nameLen),dimension(*),parameter :: AVAILABLE_physicsPackages = [ 'eigenPhysicsPackage      ',&
-                                                                             'fixedSourcePhysicsPackage',&
-                                                                             'vizPhysicsPackage        ',&
-                                                                             'rayVolPhysicsPackage     ']
+  character(nameLen),dimension(*),parameter :: AVAILABLE_physicsPackages = [ 'eigenPhysicsPackage        ',&
+                                                                             'fixedSourcePhysicsPackage  ',&
+                                                                             'vizPhysicsPackage          ',&
+                                                                             'rayVolPhysicsPackage       ',&
+                                                                             'timeDependentPhysicsPackage']
 
   !!
   !! Public interface
@@ -92,6 +94,15 @@ contains
         ! Allocate and initialise
         allocate( rayVolPhysicsPackage :: new)
         call new % init(dict)
+
+      case('timeDependentPhysicsPackage')
+        ! Allocate and initiaise
+        allocate( timeDependentPhysicsPackage :: new)
+        select type(new)
+          type is (timeDependentPhysicsPackage)
+            call new % init(dict)
+        end select
+        
 
       case default
         print *, AVAILABLE_physicsPackages

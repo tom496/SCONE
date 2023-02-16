@@ -1,0 +1,82 @@
+type timeDependentPhysicsPackage; 
+
+pop      1000;
+timeSteps   10;
+XSdata   ce;
+dataType ce; 
+timeStepLength 1.E-6;
+buffer 100;
+
+collisionOperator { neutronCE {type neutronCEimp; impGen 0;} } 
+
+transportOperator { type transportOperatorDT;
+                  } 
+
+source {
+  type pointSource;
+  r (0 0 0);
+  particle neutron;
+  E 0.025E-06;
+}
+
+tally  {
+  flux_short { type collisionClerk;
+    map { type energyMap; grid log; min 0.000000001; max 5; N 300;}
+    response (flux); flux {type fluxResponse;} filter {type timeFilter; Tmin 0.0; Tmax 0.00001;}
+  }
+  flux_long { type collisionClerk;
+    map { type energyMap; grid log; min 0.000000001; max 5; N 300;}
+    response (flux); flux {type fluxResponse;} filter {type timeFilter; Tmin 0.00001; Tmax 300.0;}
+  }
+  flux_total { type collisionClerk;
+    map { type energyMap; grid log; min 0.000000001; max 5; N 300;}
+    response (flux); flux {type fluxResponse;}
+  }
+}
+
+geometry { 
+    type geometryStd;
+    boundary (1 1 1 1 1 1);
+    graph {type shrunk;}
+
+    surfaces
+    {
+      squareBound { id 1; type box; origin ( 0.0  0.0  0.0); halfwidth (10.0 10.0 10.0); }  
+    }
+
+
+    cells
+    {
+    }
+
+    universes
+    {
+
+      root
+      {
+	  id 1;
+	  type rootUniverse; 
+	  border 1;
+	  fill hydrogen_with_uranium; 
+      }
+    }   
+}
+
+nuclearData {
+  handles {
+    ce { type aceNeutronDatabase; aceLibrary /home/tom13/myACE/JEF311.aceXS;} }
+  materials {
+ 
+    hydrogen_with_uranium {
+      temp 12345;
+      composition {
+      1001.03    1.0004;
+      92235.03   9.3472E-004;	  }
+      }
+
+} 
+  
+}
+  
+  
+  

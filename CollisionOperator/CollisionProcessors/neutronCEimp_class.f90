@@ -244,7 +244,7 @@ contains
 
       ! Sample number of fission sites generated
       ! Support -ve weight particles
-      n = int(abs( (wgt * sig_nufiss) / (w0 * sig_tot * k_eff)) + rand1, shortInt)
+      n = int(abs( (wgt * sig_nufiss) / (sig_tot * k_eff)) + rand1, shortInt)
 
       ! Shortcut particle generation if no particles were sampled
       if (n < 1) return
@@ -304,6 +304,8 @@ contains
     type(collisionData), intent(inout)   :: collDat
     class(particleDungeon),intent(inout) :: thisCycle
     class(particleDungeon),intent(inout) :: nextCycle
+    
+    !print *, '---time of capture: ', numToChar(p % time)
 
     p % isDead =.true.
 
@@ -334,6 +336,8 @@ contains
       k_eff = p % k_eff            ! k_eff for normalisation
       rand1 = p % pRNG % get()     ! Random number to sample sites
 
+      
+
       call self % nuc % getMicroXSs(microXSs, p % E, p % pRNG)
       sig_nufiss = microXSs % nuFission
       sig_fiss   = microXSs % fission
@@ -341,7 +345,19 @@ contains
       ! Sample number of fission sites generated
       ! Support -ve weight particles
       ! Note change of denominator (sig_fiss) wrt implicit generation
-      n = int(abs( (wgt * sig_nufiss) / (w0 * sig_fiss * k_eff)) + rand1, shortInt)
+      n = int(abs( (wgt * sig_nufiss) / (sig_fiss * k_eff)) + rand1, shortInt)
+      !n = int(abs( (wgt * sig_nufiss) / (sig_fiss * k_eff * w0)) + rand1, shortInt)
+
+      !print *, '   VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV'
+      !print *, '   time of fission:        ', numToChar(p % time)
+      !print *, '   current weight (wgt):   ', numToChar(wgt)
+      !print *, '   starting weight (w0):   ', numToChar(w0)
+      !print *, '   k_eff:                  ', numToChar(k_eff)
+      !print *, '   rand1:                  ', numToChar(rand1)
+      !print *, '   sig_nufiss:             ', numToChar(sig_nufiss)
+      !print *, '   sig_fiss:               ', numToChar(sig_fiss)
+      !print *, '   fission sites generated:', numToChar(n)
+      !print *, '   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^'
 
       ! Shortcut particle generation if no particles were sampled
       if (n < 1) return
@@ -367,10 +383,12 @@ contains
         pTemp % r   = r
         pTemp % dir = dir
         pTemp % E   = E_out
-        pTemp % wgt = wgt
+        pTemp % wgt = ONE
 
         call nextCycle % detain(pTemp)
       end do
+      
+      
     end if
 
     p % isDead =.true.
