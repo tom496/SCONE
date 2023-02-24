@@ -47,6 +47,8 @@ module particleDungeon_class
   !!     normWeight(totWgt)-> normalise dungeon population so its total weight is totWgt
   !!     normSize(N)       -> normalise dungeon population so it contains N particles
   !!                          does not take ununiform weight of particles into account
+  !!     normCombing(N)    -> normalise dungeon population using combing method
+  !!                          adjusts size to N and preserves total weight
   !!     setSize(n)        -> sizes dungeon to have n dummy particles for ease of overwriting
   !!     printToFile(name) -> prints population in ASCII format to file "name"
   !!
@@ -80,6 +82,7 @@ module particleDungeon_class
     procedure  :: isEmpty
     procedure  :: normWeight
     procedure  :: normSize
+    procedure  :: normCombing
     procedure  :: cleanPop
     procedure  :: popSize
     procedure  :: popWeight
@@ -351,6 +354,65 @@ contains
     end if
 
   end subroutine normSize
+
+  !!
+  !! Normalise the population using combing
+  !! Presevers total weight
+  !!
+  subroutine normCombing(self, N, rand)
+    class(particleDungeon), intent(inout)    :: self
+    integer(shortInt), intent(in)            :: N
+    integer(shortInt)                        :: i, j
+    class(RNG), intent(inout)                :: rand
+    real(defReal)                            :: w_av, nextTooth, curWeight
+    real(defReal), dimension(self % pop)     :: w_array
+    type(particleState), dimension(N)        :: newPrisoners
+    character(100), parameter :: Here =' normCombing (particleDungeon_class.f90)'
+    
+    ! Protect against invalid N
+    ! From normSize
+    if( N > size(self % prisoners)) then
+      call fatalError(Here,'Requested size: '//numToChar(N) //&
+                           'is greather then max size: '//numToChar(size(self % prisoners)))
+    else if ( N <= 0 ) then
+      call fatalError(Here,'Requested size: '//numToChar(N) //' is not +ve')
+    end if
+    
+    ! Get tooth length/new particle weight
+    w_av = self % popWeight() / N
+    
+    ! Fill array with each prisoner weight (probably neater way to do this)
+    do i=1, self % pop
+      w_array(i) = self % prisoners(i) % wgt
+    end do
+    
+    ! Get the location of the first tooth
+    nextTooth = rand % get() * w_av
+    
+    ! Set variable to store current sum of prisoners weight
+    curWeight = ZERO
+    
+    do i=1, N
+      ! Iterate over current particles
+      ! until a tooth falls within bounds of particle weight
+      do while (curWeight + self % prisoners(j) % wgt < nextTooth)
+        curWeight = curWeight + self % prisoners(j) % wgt
+        j = j + 1
+      end do
+      
+      ! When a particle has been found...
+      newPrisoners(i) = self % prisoners(j)    ! Add to new array
+      newPrisoners(i) % wgt = w_av      ! Update weight
+    end do
+    
+    ! Re-size the dungeon to new size
+    call self % setSize(N)
+    
+    ! Replace the particle at each index with the new particles
+    do i=1, N
+      call self % replace_particleState(newPrisoners(i), i)
+    end do
+  end subroutine
 
   !!
   !! Kill or particles in the dungeon

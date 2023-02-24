@@ -5,7 +5,8 @@ timeSteps 10;
 XSdata ce;
 dataType ce;
 timeStepLength 1.E-06;
-buffer 10000;
+buffer 1000;
+combing 1;
 
 // Specify output format default asciiMATLAB
 //outputFormat asciiJSON;

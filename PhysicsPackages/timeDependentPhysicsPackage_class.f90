@@ -80,6 +80,7 @@ module timeDependentPhysicsPackage_class
     integer(shortInt)  :: particleType
     integer(shortInt)  :: bufferSize
     real(defReal)      :: step_T
+    integer(shortInt)  :: useCombing
 
     ! Calculation components
     type(particleDungeon), pointer :: thisTimeStep       => null()
@@ -131,7 +132,7 @@ contains
     type(collisionOperator), save                   :: collOp
     class(transportOperator), allocatable, save     :: transOp
     type(RNG), target, save                         :: pRNG
-    real(defReal)                                   :: elapsed_T, end_T, T_toEnd, newTotalWeight, l_p, k_eff
+    real(defReal)                                   :: elapsed_T, end_T, T_toEnd, newTotalWeight
     real(defReal), intent(in)                       :: step_T
     integer(shortInt), dimension(N_timeSteps)       :: stepPopArray
     real(defReal), dimension(N_timeSteps)           :: stepWeightArray
@@ -141,8 +142,6 @@ contains
     !$omp parallel
     ! Create particle buffer
     call buffer % init(self % bufferSize)
-
-    l_p = 0.0001
 
     ! Initialise neutron
     p % geomIdx = self % geomIdx
@@ -247,34 +246,39 @@ contains
       ! Send end of cycle report
       call tally % reportCycleEnd(self % thisTimeStep)
 
-      ! Temporary variable to hold total particle weight before population normalisation
-      newTotalWeight = self % nextTimeStep % popWeight()
+      if (self % useCombing == 0) then
+          ! Temporary variable to hold total particle weight before population normalisation
+          newTotalWeight = self % nextTimeStep % popWeight()
 
-      print *, 'START Next time pop:', numToChar(self % nextTimeStep % popSize())
-      print *, '      Next time weight:', numToChar(self % nextTimeStep % popWeight())
+          print *, 'START Next time pop:', numToChar(self % nextTimeStep % popSize())
+          print *, '      Next time weight:', numToChar(self % nextTimeStep % popWeight())
 
-      ! Normalise population
-      call self % nextTimeStep % normSize(self % pop, pRNG)
+          ! Normalise population
+          call self % nextTimeStep % normSize(self % pop, pRNG)
       
-      ! Estimate k_eff
-      if (newTotalWeight /= self % nextTimeStep % popWeight()) then
-        k_eff = 1.0 + l_p * log(newTotalWeight / self % nextTimeStep % popWeight()) / step_T
+          print *, 'POP NORM Next time pop:', numToChar(self % nextTimeStep % popSize())
+          print *, '         Next time weight:', numToChar(self % nextTimeStep % popWeight())
+      
+          ! Rescale the weight of each particle to match total weight before normalisation
+          call self % nextTimeStep % normWeight(newTotalWeight)
+          
+          print *, 'WEIGHT NORM Next time pop:', numToChar(self % nextTimeStep % popSize())
+          print *, '            Next time weight:', numToChar(self % nextTimeStep % popWeight())
+      else
+          print *, 'START Next time pop:', numToChar(self % nextTimeStep % popSize())
+          print *, '      Next time weight:', numToChar(self % nextTimeStep % popWeight())
+          
+          call self % nextTimeStep % normCombing(self % pop, pRNG)
+          
+          print *, 'COMBING Next time pop:', numToChar(self % nextTimeStep % popSize())
+          print *, '            Next time weight:', numToChar(self % nextTimeStep % popWeight())
       endif
-      
-      print *, 'POP NORM Next time pop:', numToChar(self % nextTimeStep % popSize())
-      print *, '         Next time weight:', numToChar(self % nextTimeStep % popWeight())
-      
-      ! Rescale the weight of each particle to match total weight before normalisation
-      call self % nextTimeStep % normWeight(newTotalWeight)
 
       ! Add to array of weight
       stepWeightArray(i) = self % nextTimeStep % popWeight()
       
       ! Add to arrays of pop
       stepPopArray(i) = self % nextTimeStep % popSize()
-
-      print *, 'WEIGHT NORM Next time pop:', numToChar(self % nextTimeStep % popSize())
-      print *, '            Next time weight:', numToChar(self % nextTimeStep % popWeight())
 
       ! Flip timeStep dungeons
       self % temp_dungeon => self % nextTimeStep
@@ -298,7 +302,6 @@ contains
       print *, 'Pop:             ', numToChar(self % thisTimeStep % popSize())
       print *, 'Next time pop:   ', numToChar(self % thisTimeStep % popSize())
       print *, 'Total weight:    ', numToChar(self % thisTimeStep % popWeight())
-      print *, 'k_eff:           ', numToChar(k_eff)
       print *, 'simulation time: ', numToChar(i * step_T)
       print *, 'Elapsed time:    ', trim(secToChar(elapsed_T))
       print *, 'End time:        ', trim(secToChar(end_T))
@@ -306,11 +309,12 @@ contains
       call tally % display()
     end do
     print *
-    print *, '-----------------------------------------'
+    print *, '-----------------------------------------------------------------'
     do i = 1, N_timeSteps
-        print *, 'Time step ', numToChar(i), ' end pop/weight: ', numToChar(stepPopArray(i)), ' / ', numToChar(stepWeightArray(i))
+        print *, 'Time step ', numToChar(i), ' end pop/weight: ',&
+                numToChar(stepPopArray(i)), ' / ', numToChar(stepWeightArray(i))
     end do
-    print *, '-----------------------------------------'
+    print *, '-----------------------------------------------------------------'
     
   end subroutine timeSteps
 
@@ -393,6 +397,9 @@ contains
 
     ! Parallel buffer size
     call dict % getOrDefault( self % bufferSize, 'buffer', 10)
+    
+    ! Whether to use combing (default = no)
+    call dict % getOrDefault(self % useCombing, 'combing', 0)
 
     ! Register timer
     self % timerMain = registerTimer('transportTime')

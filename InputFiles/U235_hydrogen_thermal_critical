@@ -6,8 +6,9 @@ XSdata   ce;
 dataType ce; 
 timeStepLength 1.E-6;
 buffer 100;
+combing 1;
 
-collisionOperator { neutronCE {type neutronCEimp; impGen 0;} } 
+collisionOperator { neutronCE {type neutronCEimp; impGen 0; branchless 1;} } 
 
 transportOperator { type transportOperatorDT;
                   } 

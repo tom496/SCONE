@@ -431,9 +431,10 @@ contains
   !!
   !! Result:
   !!   Speed of light for photon, speed from E for neutron
+  !!   Made up number for MG (corresponds to 0.025 eV)
   !!
   !! Errors:
-  !!   Will not work with MG
+  !!   
   !!
   pure function getSpeed(self) result(speed)
     class(particle), intent(in) :: self
@@ -442,7 +443,11 @@ contains
     if (self % type == P_PHOTON) then
       speed = lightSpeed
     else
-      speed = sqrt(self % E * TWO/neutronMass) * lightSpeed
+      if (self % isMG) then
+        speed = 72.948888_defReal
+      else
+        speed = sqrt(self % E * TWO/neutronMass) * lightSpeed
+      end if
     end if
 
   end function getSpeed

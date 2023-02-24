@@ -271,5 +271,40 @@ contains
 
   end subroutine testNormPopUp
 
+@Test
+  subroutine testNormCombing()
+    type(particleDungeon)        :: dungeon
+    type(particle)               :: p
+    type(RNG)                    :: pRNG
+    real(defReal), dimension(10) :: wgtArray
+    integer(shortInt)            :: i
+    real(defReal), parameter :: TOL = 1.0E-9
+    
+    call dungeon % init(30)
+    call pRNG % init(1254684_longInt)
+    
+    wgtArray = (/2.1, 1.3, 4.5, 0.2, 3.7, 5.0, 0.05, 0.64, 0.13, 2.38/)
+    
+    do i = 1,10
+      p % w = wgtArray(i)
+      call dungeon % detain(p)
+    end do
+    
+    ! Normalise with combing
+    call dungeon % normCombing(10, pRNG)
+    
+    ! Verify size
+    @assertEqual(10, dungeon % popSize())
+    
+    ! Verify total weight
+    @assertEqual(20.0_defReal, dungeon % popWeight(), TOL)
+    
+    ! Verify individual weight
+    call dungeon % copy(p, 7)
+    @assertEqual(1.0_defReal, p % w, TOL)
+    
+    ! Clean memory
+    call dungeon % kill()
+  end subroutine
 
 end module particleDungeon_test
