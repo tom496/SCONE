@@ -271,6 +271,7 @@ contains
     character(100),parameter :: Here = 'fission (neutronMGimp_class.f90)'
     
     if (.not. self % implicitSites) then
+      !print *, '   time of fission:        ', numToChar(p % time)
       ! Obtain required data
       wgt   = p % w                ! Current weight
       w0    = p % preHistory % wgt ! Starting weight

@@ -332,6 +332,7 @@ contains
     character(100),parameter             :: Here = 'fission (neutronCEimp_class.f90)'
 
     if (.not.self % implicitSites) then
+    
       ! Obtain required data
       wgt   = p % w                ! Current weight
       w0    = p % preHistory % wgt ! Starting weight
@@ -353,16 +354,16 @@ contains
         ! More sophisticated way to sample nu than just adding rand1??
         nu = abs((sig_nufiss) / (sig_fiss * k_eff))
         
-        print *, '   VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV'
-        print *, '   time of fission:        ', numToChar(p % time)
-        print *, '   current weight (wgt):   ', numToChar(wgt)
-        print *, '   starting weight (w0):   ', numToChar(w0)
-        print *, '   starting energy:        ', numToChar(p % E)
+        !print *, '   VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV'
+        !print *, '   time of fission:        ', numToChar(p % time)
+        !print *, '   current weight (wgt):   ', numToChar(wgt)
+        !print *, '   starting weight (w0):   ', numToChar(w0)
+        !print *, '   starting energy:        ', numToChar(p % E)
         !print *, '   k_eff:                  ', numToChar(k_eff)
-        print *, '   rand1:                  ', numToChar(rand1)
-        print *, '   sig_nufiss:             ', numToChar(sig_nufiss)
-        print *, '   sig_fiss:               ', numToChar(sig_fiss)
-        print *, '   nu:                     ', numToChar(nu)
+        !print *, '   rand1:                  ', numToChar(rand1)
+        !print *, '   sig_nufiss:             ', numToChar(sig_nufiss)
+        !print *, '   sig_fiss:               ', numToChar(sig_fiss)
+        !print *, '   nu:                     ', numToChar(nu)
         
         r = p % rGlobal()
         call fiss % sampleOut(mu, phi, E_out, p % E, p % pRNG)
@@ -373,10 +374,10 @@ contains
         call p % rotate(mu, phi)
         p % E = E_out
         p % w = nu * p % w
-        print *, '   E_out:                  ', numToChar(E_out)
-        print *, '   w scaling factor:       ', numToChar(nu - ONE)
-        print *, '   w after fiss:           ', numToChar(p % w)
-        print *, '   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^'
+        !print *, '   E_out:                  ', numToChar(E_out)
+        !print *, '   w scaling factor:       ', numToChar(nu - ONE)
+        !print *, '   w after fiss:           ', numToChar(p % w)
+        !print *, '   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^'
       else
         ! Sample number of fission sites generated
         ! Support -ve weight particles

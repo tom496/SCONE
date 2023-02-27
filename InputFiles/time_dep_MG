@@ -1,0 +1,74 @@
+type timeDependentPhysicsPackage; 
+
+pop            10000;
+timeSteps      10;
+XSdata         mg;
+dataType       mg;
+timeStepLength 1.;
+buffer 100; 
+
+collisionOperator { neutronCE {type neutronCEstd;}
+                    neutronMG {type neutronMGimp; impGen 0;}
+                  } 
+
+transportOperator { type transportOperatorDT;
+                  }
+
+source {
+  type pointSource;
+  r (0 0 0);
+  particle neutron;
+  G 1;
+}
+
+tally  {  
+}
+
+geometry { 
+    type geometryStd;
+    boundary (1 1 1 1 1 1);
+    graph {type shrunk;}
+
+    surfaces
+    {
+      squareBound { id 1; type box; origin ( 0.0  0.0  0.0); halfwidth (10.0 10.0 10.0); }  
+    }
+
+
+    cells
+    {
+    }
+
+    universes
+    {
+
+      root
+      {
+	  id 1;
+	  type rootUniverse; 
+	  border 1;
+	  fill group1; 
+      }
+    }   
+}
+
+nuclearData {
+
+  handles { 
+     ce { type aceNeutronDatabase; aceLibrary /home/tom13/SCONE/SCONE/fullLib.xsfile;}
+     mg { type baseMgNeutronDatabase; PN P0;} 
+  }
+  
+  
+  materials { 
+  
+      group1 {  
+        temp       273; 
+        composition {
+          92235.03  0.037047; 
+        }   
+        xsFile /home/tom13/SCONE/SCONE/InputFiles/XS/time_dep_XSS;
+      }	 
+  }
+} 
+  

@@ -65,7 +65,7 @@ geometry {
 
 nuclearData {
   handles {
-    ce { type aceNeutronDatabase; aceLibrary /home/tom13/myACE/JEF311.aceXS;} }
+    ce { type aceNeutronDatabase; aceLibrary /home/tom13/SCONE/SCONE/fullLib.xsfile;} }
   materials {
  
     hydrogen_with_uranium {
