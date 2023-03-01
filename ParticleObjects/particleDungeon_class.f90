@@ -453,6 +453,8 @@ contains
     type(particleState), dimension(N)        :: newPrisoners
     character(100), parameter :: Here =' normCombing (particleDungeon_class.f90)'
     
+   !print *, 'started combing'
+    
     ! Protect against invalid N
     ! From normSize
     if( N > size(self % prisoners)) then
@@ -476,17 +478,32 @@ contains
     ! Set variable to store current sum of prisoners weight
     curWeight = ZERO
     
+    j=1
+   !print *, 'pop: ', numToChar(self % pop)
+   !print *, 'w_av: ', numToChar(w_av)
+   !print *, 'target pop: ', numToChar(N)
+    
     do i=1, N
+      !print *, ' '
+      !print *, 'j: ', numToChar(j)
+     !print *, 'i: ', numToChar(i)
+     !print *, 'curWeight: ', numToChar(curWeight)
+     !print *, 'wgt: ', numToChar(self % prisoners(j) % wgt)
+     !print *, 'nextTooth: ', numToChar(nextTooth)
       ! Iterate over current particles
       ! until a tooth falls within bounds of particle weight
       do while (curWeight + self % prisoners(j) % wgt < nextTooth)
+       !print *, '  j: ', numToChar(j)
+       !print *, '  curWeight: ', numToChar(curWeight)
+       !print *, '  nextTooth: ', numToChar(nextTooth)
         curWeight = curWeight + self % prisoners(j) % wgt
         j = j + 1
       end do
       
       ! When a particle has been found...
-      newPrisoners(i) = self % prisoners(j)    ! Add to new array
-      newPrisoners(i) % wgt = w_av      ! Update weight
+      newPrisoners(i) = self % prisoners(j)     ! Add to new array
+      newPrisoners(i) % wgt = w_av              ! Update weight
+      nextTooth = nextTooth + w_av              ! Update position of tooth
     end do
     
     ! Re-size the dungeon to new size
