@@ -2,6 +2,7 @@ module pureCapture_class
 
   use numPrecision
   use endfConstants
+  use universalVariables,           only : precursorGroups
   use genericProcedures,            only : fatalError, numToChar
   use RNG_class,                    only : RNG
   use dataDeck_inter,               only : dataDeck
@@ -130,21 +131,24 @@ contains
   !!
   !! See uncorrelatedReactionCE for details
   !!
-  subroutine sampleOut(self, mu, phi, E_out, E_in, rand, lambda)
+  subroutine sampleOut(self, mu, phi, E_out, E_in, rand, lambda, fd_i, groupedPrecursors)
     class(pureCapture), intent(in)         :: self
     real(defReal), intent(out)             :: mu
     real(defReal), intent(out)             :: phi
     real(defReal), intent(out)             :: E_out
     real(defReal), intent(in)              :: E_in
     class(RNG), intent(inout)              :: rand
-    real(defReal), intent(out), optional   :: lambda
+    real(defReal), dimension(precursorGroups), intent(out), optional :: lambda
+    real(defReal), dimension(precursorGroups), intent(out), optional :: fd_i
+    logical(defBool), intent(in), optional :: groupedPrecursors
 
     E_out = E_in
     mu = ONE
     phi = ZERO
 
     ! Default to the prompt particle
-    if(present(lambda)) lambda = huge(lambda)
+    if(present(lambda)) lambda(:) = -ONE
+    if(present(fd_i)) fd_i(:) = -ONE
 
   end subroutine sampleOut
 

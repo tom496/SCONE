@@ -80,12 +80,14 @@ module timeDependentPhysicsPackage_class
     integer(shortInt)  :: particleType
     integer(shortInt)  :: bufferSize
     real(defReal)      :: step_T
-    integer(shortInt)  :: useCombing
+    logical(defBool)   :: useCombing
+    logical(defBool)   :: usePrecursors
 
     ! Calculation components
     type(particleDungeon), pointer :: thisTimeStep       => null()
     type(particleDungeon), pointer :: nextTimeStep       => null()
     type(particleDungeon), pointer :: temp_dungeon       => null()
+    type(particleDungeon), pointer :: precursorDungeon   => null()
     class(source), allocatable     :: timeDependent
 
     ! Timer bins
@@ -128,14 +130,17 @@ contains
     integer(shortInt), intent(in)                   :: N_timeSteps
     integer(shortInt)                               :: i, n, nParticles
     type(particle), save                            :: p
+    type(particle), save                            :: p_Precursor
     type(particleDungeon), save                     :: buffer
     type(collisionOperator), save                   :: collOp
     class(transportOperator), allocatable, save     :: transOp
     type(RNG), target, save                         :: pRNG
-    real(defReal)                                   :: elapsed_T, end_T, T_toEnd, newTotalWeight
+    real(defReal)                                   :: elapsed_T, end_T, T_toEnd
+    real(defReal)                                   :: newTotalWeight
+    real(defReal)                                   :: decay_T, w_d
     real(defReal), intent(in)                       :: step_T
-    integer(shortInt), dimension(N_timeSteps)       :: stepPopArray
-    real(defReal), dimension(N_timeSteps)           :: stepWeightArray
+    integer(shortInt), dimension(N_timeSteps)       :: stepPopArray, stepPrecursorArray
+    real(defReal), dimension(N_timeSteps)           :: stepWeightArray, stepPrecursorWeightArray
     character(100),parameter :: Here ='time steps (timeDependentPhysicsPackage_class.f90)'
     !$omp threadprivate(p, buffer, collOp, transOp, pRNG)
 
@@ -173,6 +178,31 @@ contains
       
       ! previously set timeMax here but this caused omp issues
       
+      if (self % usePrecursors) then
+          ! Forced precursor decay
+          do n = 1, self % precursorDungeon % popSize()
+            call self % precursorDungeon % copy(p_Precursor, n)
+            
+            ! Sample decay time
+            decay_T = step_T * (i - pRNG % get())
+            
+            ! Weight adjustment
+            ! CHECK THIS: should be adjusting by delayed fraction? -- no, think this is correct
+            w_d = p_Precursor % w * step_T * p_Precursor % lambda_i *&
+                    exp(-p_precursor % lambda_i * (decay_T - p_Precursor % time))
+                    
+            ! Update parameters
+            p_Precursor % type = P_NEUTRON
+            p_Precursor % time = decay_T
+            p_Precursor % w = w_d
+            
+            p_Precursor % lambda_i = -ONE
+            p_Precursor % fd_i = -ONE
+            
+            ! Add to current dungeon
+            call self % thisTimeStep % detain(p_Precursor)
+          end do
+      endif
 
       !$omp parallel do schedule(dynamic)
       gen: do n = 1, nParticles
@@ -221,7 +251,12 @@ contains
 
             if(p % isDead) exit history
 
-            call collOp % collide(p, tally, buffer, buffer)
+            if(self % usePrecursors) then
+                call collOp % collide(p, tally, self % precursorDungeon, buffer)
+            else
+                call collOp % collide(p, tally, self % precursorDungeon, buffer)
+            endif
+            
             if(p % isDead) exit history
           end do history
 
@@ -246,39 +281,49 @@ contains
       ! Send end of cycle report
       call tally % reportCycleEnd(self % thisTimeStep)
 
-      if (self % useCombing == 0) then
+      if (self % useCombing) then
+          !print *, 'START Next time pop:', numToChar(self % nextTimeStep % popSize())
+          !print *, '      Next time weight:', numToChar(self % nextTimeStep % popWeight())
+          
+          call self % nextTimeStep % normCombing(self % pop, pRNG)
+          
+          !print *, 'COMBING Next time pop:', numToChar(self % nextTimeStep % popSize())
+          !print *, '            Next time weight:', numToChar(self % nextTimeStep % popWeight())
+          
+      else
           ! Temporary variable to hold total particle weight before population normalisation
           newTotalWeight = self % nextTimeStep % popWeight()
 
-          print *, 'START Next time pop:', numToChar(self % nextTimeStep % popSize())
-          print *, '      Next time weight:', numToChar(self % nextTimeStep % popWeight())
+          !print *, 'START Next time pop:', numToChar(self % nextTimeStep % popSize())
+          !print *, '      Next time weight:', numToChar(self % nextTimeStep % popWeight())
 
           ! Normalise population
           call self % nextTimeStep % normSize(self % pop, pRNG)
       
-          print *, 'POP NORM Next time pop:', numToChar(self % nextTimeStep % popSize())
-          print *, '         Next time weight:', numToChar(self % nextTimeStep % popWeight())
+          !print *, 'POP NORM Next time pop:', numToChar(self % nextTimeStep % popSize())
+          !print *, '         Next time weight:', numToChar(self % nextTimeStep % popWeight())
       
           ! Rescale the weight of each particle to match total weight before normalisation
           call self % nextTimeStep % normWeight(newTotalWeight)
           
-          print *, 'WEIGHT NORM Next time pop:', numToChar(self % nextTimeStep % popSize())
-          print *, '            Next time weight:', numToChar(self % nextTimeStep % popWeight())
-      else
-          print *, 'START Next time pop:', numToChar(self % nextTimeStep % popSize())
-          print *, '      Next time weight:', numToChar(self % nextTimeStep % popWeight())
-          
-          call self % nextTimeStep % normCombing(self % pop, pRNG)
-          
-          print *, 'COMBING Next time pop:', numToChar(self % nextTimeStep % popSize())
-          print *, '            Next time weight:', numToChar(self % nextTimeStep % popWeight())
+          !print *, 'WEIGHT NORM Next time pop:', numToChar(self % nextTimeStep % popSize())
+          !print *, '            Next time weight:', numToChar(self % nextTimeStep % popWeight())
       endif
+      
+      ! Precursor population control
+      
 
       ! Add to array of weight
       stepWeightArray(i) = self % nextTimeStep % popWeight()
       
       ! Add to arrays of pop
       stepPopArray(i) = self % nextTimeStep % popSize()
+      
+      ! Add precursors pop to array
+      stepPrecursorArray(i) = self % precursorDungeon % popSize()
+      
+      ! Add precursor timed weight to array
+      stepPrecursorWeightArray(i) = self % precursorDungeon % totalTimedWeight(step_T * i)
 
       ! Flip timeStep dungeons
       self % temp_dungeon => self % nextTimeStep
@@ -314,6 +359,13 @@ contains
         print *, 'Time step ', numToChar(i), ' end pop/weight: ',&
                 numToChar(stepPopArray(i)), ' / ', numToChar(stepWeightArray(i))
     end do
+    print *
+    do i = 1, N_timeSteps
+        print *, 'Time step ', numToChar(i)
+        print *, '      precursor pop/weight: ',&
+                numToChar(stepPrecursorArray(i)), ' / ', numToChar(stepPrecursorWeightArray(i))
+    end do
+    
     print *, '-----------------------------------------------------------------'
     
   end subroutine timeSteps
@@ -399,7 +451,10 @@ contains
     call dict % getOrDefault( self % bufferSize, 'buffer', 10)
     
     ! Whether to use combing (default = no)
-    call dict % getOrDefault(self % useCombing, 'combing', 0)
+    call dict % getOrDefault(self % useCombing, 'combing', .false.)
+    
+    ! Whether to implement precursors (default = yes)
+    call dict % getOrDefault(self % usePrecursors, 'precursors', .true.)
 
     ! Register timer
     self % timerMain = registerTimer('transportTime')
@@ -463,6 +518,10 @@ contains
     ! Size particle dungeon
     allocate(self % nextTimeStep)
     call self % nextTimeStep % init(10 * self % pop)
+    
+    ! Size precursor dungeon
+    allocate(self % precursorDungeon)
+    call self % precursorDungeon % init(10 * self % pop)
 
     call self % printSettings()
 

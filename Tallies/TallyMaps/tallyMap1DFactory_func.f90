@@ -32,6 +32,7 @@ module tallyMap1DFactory_func
   use weightMap_class,   only : weightMap
   use cellMap_class,     only : cellMap
   use testMap_class,     only : testMap
+  use timeMap_class,     only : timeMap
 !  use matXsMap_class,    only : matXsMap
 
   implicit none
@@ -52,7 +53,8 @@ module tallyMap1DFactory_func
                                                                                 'homogMatMap',&
                                                                                 'weightMap  ',&
                                                                                 'cellMap    ',&
-                                                                                'testMap    ']
+                                                                                'testMap    ',&
+                                                                                'timeMap    ']
 
 contains
 
@@ -109,6 +111,10 @@ contains
 
       case('testMap')
         allocate(testMap :: new)
+        call new % init(dict)
+        
+      case('timeMap')
+        allocate(timeMap :: new)
         call new % init(dict)
 
      !*** NEW TALLY MAP TEMPLATE ***!

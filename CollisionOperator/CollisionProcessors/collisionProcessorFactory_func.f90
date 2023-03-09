@@ -8,10 +8,11 @@ module collisionProcessorFactory_func
   use collisionProcessor_inter, only : collisionProcessor
 
   ! Implementation
-  use neutronCEstd_class, only : neutronCEstd
-  use neutronCEimp_class, only : neutronCEimp
-  use neutronMGstd_class, only : neutronMGstd
-  use neutronMGimp_class, only : neutronMGimp
+  use neutronCEstd_class, only  : neutronCEstd
+  use neutronCEimp_class, only  : neutronCEimp
+  use neutronMGstd_class, only  : neutronMGstd
+  use neutronMGimp_class, only  : neutronMGimp
+  use neutronCEtime_class, only : neutronCEtime
 
   implicit none
   private
@@ -23,10 +24,11 @@ module collisionProcessorFactory_func
   ! It is printed if type was unrecognised
   ! NOTE:
   ! For now  it is necessary to adjust trailing blanks so all enteries have the same length
-  character(nameLen),dimension(*),parameter :: AVALIBLE_collisionProcessors = [ 'neutronCEstd',&
-                                                                                'neutronCEimp',&
-                                                                                'neutronMGstd',&
-                                                                                'neutronMGimp']
+  character(nameLen),dimension(*),parameter :: AVALIBLE_collisionProcessors = [ 'neutronCEstd ',&
+                                                                                'neutronCEimp ',&
+                                                                                'neutronMGstd ',&
+                                                                                'neutronMGimp ',&
+                                                                                'neutronCEtime']
 
 contains
 
@@ -63,6 +65,10 @@ contains
 
       case('neutronMGimp')
         allocate(neutronMGimp :: new)
+        call new % init(dict)
+
+      case('neutronCEtime')
+        allocate(neutronCEtime :: new)
         call new % init(dict)
 
      !*** NEW COLLISION PROCESSOR TEMPLATE ***!

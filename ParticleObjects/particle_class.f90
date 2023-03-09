@@ -12,8 +12,9 @@ module particle_class
   !!
   !! Particle types paramethers
   !!
-  integer(shortInt), parameter,public :: P_NEUTRON = 1,&
-                                         P_PHOTON  = 2
+  integer(shortInt), parameter,public :: P_NEUTRON   = 1,&
+                                         P_PHOTON    = 2,&
+                                         P_PRECURSOR = 3
 
   !!
   !! Public particle type procedures
@@ -33,6 +34,8 @@ module particle_class
   !!   isMG     -> True if particle uses MG data
   !!   type     -> Physical Type of the particle (NEUTRON, PHOTON etc.)
   !!   time     -> Position in time of the particle [s]
+  !!   lambda_i -> Decay constant if a precursor [/s]
+  !!   fd_i     -> Fraction of precursors in this group (usually beta_i/beta)
   !!   matIdx   -> material Index in which particle is present
   !!   cellIdx  -> Cell Index at the lowest level in which particle is present
   !!   uniqueID -> Unique ID of the cell at the lowest level in which particle is present
@@ -51,6 +54,8 @@ module particle_class
     logical(defBool)           :: isMG = .false.    ! Is neutron multi-group
     integer(shortInt)          :: type = P_NEUTRON  ! Particle physical type
     real(defReal)              :: time = ZERO       ! Particle time position
+    real(defReal)              :: lambda_i = -ONE   ! Precursor decay constant
+    real(defReal)              :: fd_i     = -ONE   ! Precursor group fraction
     integer(shortInt)          :: matIdx   = -1     ! Material index where particle is
     integer(shortInt)          :: cellIdx  = -1     ! Cell idx at the lowest coord level
     integer(shortInt)          :: uniqueID = -1     ! Unique id at the lowest coord level
@@ -83,6 +88,8 @@ module particle_class
   !! In current form it was designed to support neutron and other neutral particles
   !! By extension(inheritance) support for photons or charged particles could be introduced
   !!
+  !! Now also represents precursors.
+  !!
   !! In addition to representing a particle by physical parameters, it containes additional
   !! data like RNG pointer. This is to enable access to objects associated with a particlular
   !! particle history from anywhere where a particle was passed. This it works kind of like a
@@ -100,6 +107,10 @@ module particle_class
     integer(shortInt)          :: G         ! Particle Energy Group
     real(defReal)              :: w         ! Particle Weight
     real(defReal)              :: time      ! Particle time point
+
+    ! Precursor particle data
+    real(defReal)              :: lambda_i  ! Precursor decay constant
+    real(defReal)              :: fd_i      ! Precursor fraction
 
     ! Particle flags
     real(defReal)              :: w0             ! Particle initial weight (for implicit, variance reduction...)
@@ -136,6 +147,10 @@ module particle_class
     procedure                  :: matIdx
     procedure, non_overridable :: getType
     procedure                  :: getSpeed
+    
+    ! Inquiry about precursor parameters
+    procedure               :: getExpPrecWeight
+    procedure               :: getTimedWeight
 
     ! Operations on coordinates
     procedure            :: moveGlobal
@@ -177,10 +192,12 @@ contains
   !!   E   -> Energy [MeV]
   !!   w   -> particle weight
   !! Optional arguments:
-  !!   t   -> particle time (default = 0.0)
-  !!   type-> particle type (default = P_NEUTRON)
+  !!   t        -> particle time (default = 0.0)
+  !!   lambda_i -> precursor decay constant (default = -1.0)
+  !!   fd_i     -> precursor fraction (default = -1.0)
+  !!   type     -> particle type (default = P_NEUTRON)
   !!
-  pure subroutine buildCE(self, r, dir, E, w, t, type)
+  pure subroutine buildCE(self, r, dir, E, w, t, type, lambda_i, fd_i)
     class(particle), intent(inout)          :: self
     real(defReal),dimension(3),intent(in)   :: r
     real(defReal),dimension(3),intent(in)   :: dir
@@ -188,6 +205,8 @@ contains
     real(defReal),intent(in)                :: w
     real(defReal),optional,intent(in)       :: t
     integer(shortInt),intent(in),optional   :: type
+    real(defReal),optional,intent(in)       :: lambda_i
+    real(defReal),optional,intent(in)       :: fd_i
 
 
     call self % coords % init(r, dir)
@@ -202,6 +221,18 @@ contains
       self % time = t
     else
       self % time = ZERO
+    end if
+    
+    if(present(lambda_i)) then
+      self % lambda_i = lambda_i
+    else
+      self % lambda_i = -ONE
+    end if
+    
+    if(present(fd_i)) then
+      self % fd_i = fd_i
+    else
+      self % fd_i = -ONE
     end if
 
     if(present(type)) then
@@ -221,9 +252,11 @@ contains
   !!   w   -> particle weight
   !! Optional arguments:
   !!   t   -> particle time (default = 0.0)
+  !!   lambda_i -> precursor decay constant (default = -1.0)
+  !!   fd_i     -> precursor fraction (default = -1.0)
   !!   type-> particle type (default = P_NEUTRON)
   !!
-  subroutine buildMG(self, r, dir, G, w, t, type)
+  subroutine buildMG(self, r, dir, G, w, t, type, lambda_i, fd_i)
     class(particle), intent(inout)          :: self
     real(defReal),dimension(3),intent(in)   :: r
     real(defReal),dimension(3),intent(in)   :: dir
@@ -231,6 +264,8 @@ contains
     integer(shortInt),intent(in)            :: G
     real(defReal),intent(in),optional       :: t
     integer(shortInt),intent(in),optional   :: type
+    real(defReal),optional,intent(in)       :: lambda_i
+    real(defReal),optional,intent(in)       :: fd_i
 
     call self % coords % init(r, dir)
     self % G  = G
@@ -244,6 +279,18 @@ contains
       self % time = t
     else
       self % time = ZERO
+    end if
+    
+    if(present(lambda_i)) then
+      self % lambda_i = lambda_i
+    else
+      self % lambda_i = -ONE
+    end if
+    
+    if(present(fd_i)) then
+      self % fd_i = fd_i
+    else
+      self % fd_i = -ONE
     end if
 
     if(present(type)) then
@@ -271,6 +318,8 @@ contains
     LHS % isMG                  = RHS % isMG
     LHS % type                  = RHS % type
     LHS % time                  = RHS % time
+    LHS % lambda_i              = RHS % lambda_i
+    LHS % fd_i                  = RHS % fd_i
 
   end subroutine particle_fromParticleState
 
@@ -451,6 +500,66 @@ contains
     end if
 
   end function getSpeed
+  
+  !!
+  !! Return expected neutron weight for decay in next time step
+  !!
+  !! Args:
+  !!   t1     -> start time of next time step
+  !!   step_T -> length of next time step
+  !!
+  !! Result:
+  !!   Expected neutron weight for decay in next time step
+  !!   Returns ZERO if particle is not a precursor
+  !!
+  !! Errors:
+  !!   
+  !!
+  function getExpPrecWeight(self, t1, step_T) result(w_d_av)
+    class(particle), intent(in) :: self
+    real(defReal), intent(in)   :: t1, step_T
+    real(defReal)               :: w_d_av
+
+    if (self % type == P_PRECURSOR) then
+      w_d_av = self % w * &
+               (exp(-self % lambda_i * (t1 - self % time)) - &
+               exp(-self % lambda_i *(t1 + step_T - self % time)))
+    else
+      w_d_av = ZERO
+    end if
+
+  end function getExpPrecWeight
+  
+  !!
+  !! Return current timed weight of particle
+  !!
+  !! Args:
+  !!   t      -> current time [s]
+  !!
+  !! Result:
+  !!   Current timed weight at time t
+  !!   Returns ZERO if particle is not a precursor
+  !!
+  !! Errors:
+  !!   
+  !!
+  function getTimedWeight(self, t) result(w_Timed)
+    class(particle), intent(in) :: self
+    real(defReal), intent(in)   :: t
+    real(defReal)               :: w_Timed
+    
+    if (self % type == P_PRECURSOR) then
+      w_Timed = self % w * exp(-self % lambda_i * (t - self % time))
+      !print *, 'Regular weight: ', numToChar(self % w)
+      !print *, 'Self time:      ', numToChar(self % time)
+      !print *, 'lambda_i:       ', numToChar(self % lambda_i)
+      !print *, 'Current time:   ', numToChar(t)
+      !print *, 'Timed weight:   ', numToChar(w_Timed)
+      !print *
+    else
+      w_Timed = ZERO
+    end if
+  end function getTimedWeight
 
 !!<><><><><><><>><><><><><><><><><><><>><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
 !! Particle operations on coordinates procedures
@@ -720,6 +829,8 @@ contains
     self % G    = 0
     self % isMG = .false.
     self % type = P_NEUTRON
+    self % lambda_i = -ONE
+    self % fd_i     = -ONE
     self % time = ZERO
     self % matIdx   = -1
     self % cellIdx  = -1

@@ -94,6 +94,11 @@ module particleDungeon_class
     procedure  :: popWeight
     procedure  :: setSize
     procedure  :: printToFile
+    
+    !! Precursor procedures
+    procedure  :: precursorRoulette
+    procedure  :: precursorCombing
+    procedure  :: totalTimedWeight
 
     ! Private procedures
     procedure, private :: detain_particle
@@ -513,7 +518,101 @@ contains
     do i=1, N
       call self % replace_particleState(newPrisoners(i), i)
     end do
-  end subroutine
+  end subroutine normCombing
+  
+  !!
+  !! Normalises precusor population
+  !! Done according to expected neutron weight in
+  !! DOES NOT WORK YET DO NOT USE
+  !!
+  subroutine precursorRoulette(self, N, rand, t1, step_T)
+    class(particleDungeon), intent(inout)    :: self
+    integer(shortInt), intent(in)            :: N
+    class(RNG), intent(inout)                :: rand
+    real(defReal), intent(in)                :: t1, step_T
+    integer(shortInt)                        :: i
+    type(particle)                           :: p
+    real(defReal), dimension(N)              :: weights
+    
+    character(100), parameter :: Here =' precursorRoulette (particleDungeon_class.f90)'
+    
+    call self % normSize(N, rand)
+    
+    do i=1, N
+      call self % copy(p, i)
+      weights(i) = p % w
+      p % w = p % getExpPrecWeight(t1, step_T)
+      call self % replace(p, i)
+    end do
+    
+    do i=1, N
+      call self % copy(p, i)
+      p % w = weights(i)
+      call self % replace(p, i)
+    end do
+  end subroutine precursorRoulette
+  
+  !!
+  !! Normalises precusor population by combing
+  !! Done according to expected neutron weight for forced decay in ntext time interval
+  !!
+  subroutine precursorCombing(self, N, rand, t)
+    class(particleDungeon), intent(inout)    :: self
+    integer(shortInt), intent(in)            :: N
+    class(RNG), intent(inout)                :: rand
+    real(defReal), intent(in)                :: t
+    integer(shortInt)                        :: i, j
+    type(particle)                           :: p
+    type(particleState), dimension(N)        :: newPrecursors
+    real(defReal), dimension(self % pop)     :: wTimedArray, T_kArray
+    real(defReal)                            :: wTimedTotal, w_av, nextTooth, curTimedWeight
+    
+    character(100), parameter :: Here =' precursorCombing (particleDungeon_class.f90)'
+
+    
+    ! Protect against invalid N
+    ! From normSize
+    if( N > size(self % prisoners)) then
+      call fatalError(Here,'Requested size: '//numToChar(N) //&
+                           'is greather then max size: '//numToChar(size(self % prisoners)))
+    else if ( N <= 0 ) then
+      call fatalError(Here,'Requested size: '//numToChar(N) //' is not +ve')
+    end if
+
+    wTimedTotal = ZERO
+
+    ! Get timed weight of each precursor
+    do i=1, self % pop
+      call self % copy(p, i)
+      wTimedArray(i) = p % getTimedWeight(t)
+      T_kArray(i) = wTimedArray(i) / p % w
+      wTimedTotal = wTimedTotal + wTimedArray(i)
+    end do
+    
+    ! Tooth distance
+    w_av = wTimedTotal / N
+    
+    ! First tooth location
+    nextTooth = rand % get() * w_av
+    
+    j=1
+    curTimedWeight = ZERO
+    
+    do i=1, N
+      ! Iterate over current precursor
+      ! until a tooth falls within bounds of timed weight
+      do while (curTimedWeight + wTimedArray(i) < nextTooth)
+        curTimedWeight = curTimedWeight + wTimedArray(i)
+        j = j + 1
+      end do
+      
+      ! When a particle has been found...
+      newPrecursors(i) = self % prisoners(j)      ! Add to new array
+      newPrecursors(i) % wgt = w_av / T_kArray(j) ! Update weight from timed weight
+      nextTooth = nextTooth + w_av                ! Update position of tooth
+    end do
+    
+  end subroutine precursorCombing
   
   !!
   !! Kill or particles in the dungeon
@@ -546,6 +645,24 @@ contains
     wgt = sum( self % prisoners(1:self % pop) % wgt )
 
   end function popWeight
+
+  !!
+  !! Returns total population weight
+  !!
+  function totalTimedWeight(self, t) result(timedWeight)
+    class(particleDungeon), intent(in) :: self
+    real(defReal)                      :: timedWeight
+    real(defReal), intent(in)          :: t
+    integer(shortInt)                  :: i
+    type(particle)                     :: p
+
+    timedWeight = ZERO
+    do i = 1, self % pop
+        p = self % prisoners(i)
+        timedWeight = timedWeight + p % getTimedWeight(t)
+    end do
+
+  end function totalTimedWeight
 
   !!
   !! Set size of the dungeon to n

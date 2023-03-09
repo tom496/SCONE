@@ -2,6 +2,7 @@ module fissionCE_class
 
   use numPrecision
   use endfConstants
+  use universalVariables,           only : shake, precursorGroups
   use genericProcedures,            only : fatalError, numToChar
   use RNG_class,                    only : RNG
   use dataDeck_inter,               only : dataDeck
@@ -78,6 +79,8 @@ module fissionCE_class
 
     ! Type specific procedures
     procedure :: buildFromACE
+    procedure :: samplePrompt
+    procedure :: sampleDelayed
   end type fissionCE
 
 contains
@@ -208,22 +211,76 @@ contains
 
   end function releaseDelayed
 
+
+  subroutine samplePrompt(self, E_out, E_in, rand)
+    class(fissionCE), intent(in)         :: self
+    real(defReal), intent(out)           :: E_out
+    real(defReal), intent(in)            :: E_in
+    class(RNG), intent(inout)            :: rand
+    character(100),parameter :: Here = 'samplePrompt (fissionCE_class.f90)'
+    
+    E_out = self % eLawPrompt % sample(E_in, rand)
+  end subroutine samplePrompt
+  
+  subroutine sampleDelayed(self, E_out, E_in, rand, p_del, lambda, fd_i, groupedPrecursors)
+    class(fissionCE), intent(in)                           :: self
+    real(defReal), intent(out)                             :: E_out
+    real(defReal), intent(in)                              :: E_in
+    class(RNG), intent(inout)                              :: rand
+    real(defReal), intent(in)                              :: p_del
+    real(defReal), intent(out), dimension(precursorGroups) :: lambda
+    real(defReal), intent(out), dimension(precursorGroups) :: fd_i
+    real(defReal)                                          :: r2
+    integer(shortInt)                                      :: i, N
+    character(100),parameter :: Here = 'sampleDelayed (fissionCE_class.f90)'
+  
+    r2 = rand % get()
+    
+    if (size(self % delayed) .= precursorGroups) then
+        call fatalError(Here, 'Delayed precursor groups =/= set value (8)')
+    endif
+    
+    if (groupedPrecursors)
+    ! Loop over precursor groups
+    precursors: do i=1,size(self % delayed)
+      r2 = r2 - self % delayed(i) % prob % at(E_in)
+      if( r2 < ZERO) then
+        E_out = self % delayed(i) % eLaw % sample(E_in, rand)
+        lambda = self % delayed(i) % lambda
+        !print *, 'lambda: ', numToChar(lambda)
+        fd_i = self % delayed(i) % prob % at(E_in) / p_del
+        
+        return
+      end if
+    end do precursors
+
+    ! Sampling failed -> Choose top precursor group
+    N = size(self % delayed)
+    E_out = self % delayed(N) % eLaw % sample(E_in, rand)
+    lambda = self % delayed(N) % lambda
+    fd_i = self % delayed(N) % prob % at(E_in) / p_del
+
+  end subroutine sampleDelayed
+
   !!
   !! Sample outgoing particle
   !!
   !! See uncorrelatedReactionCE for details
   !!
-  subroutine sampleOut(self, mu, phi, E_out, E_in, rand, lambda)
+  subroutine sampleOut(self, mu, phi, E_out, E_in, rand, lambda, fd_i, groupedPrecursors)
     class(fissionCE), intent(in)         :: self
     real(defReal), intent(out)           :: mu
     real(defReal), intent(out)           :: phi
     real(defReal), intent(out)           :: E_out
     real(defReal), intent(in)            :: E_in
     class(RNG), intent(inout)            :: rand
-    real(defReal), intent(out), optional :: lambda
-    real(defReal)                        :: p_del, r1, r2
-    integer(shortInt)                    :: i, N
+    real(defReal), intent(out), dimension(precursorGroups), optional :: lambda
+    real(defReal), intent(out), dimension(precursorGroups), optional :: fd_i
+    logical(defBool),intent(in),optional :: groupedPrecursors
+    real(defReal)                        :: p_del, r1
+    real(defReal), dimension(precursorGroups) :: temp_lambda, temp_fd_i
     character(100),parameter :: Here = 'sample (fissionCE_class.f90)'
+
 
     ! Sample mu
     mu = TWO * rand % get() - ONE
@@ -232,7 +289,7 @@ contains
     phi = TWO_PI * rand % get()
 
     ! Sample E_out
-    E_out = self % eLawPrompt % sample(E_in, rand)
+    !E_out = self % eLawPrompt % sample(E_in, rand)
 
     ! Calculate delayed emission probability
     if(allocated(self % delayed)) then
@@ -243,28 +300,15 @@ contains
 
     r1 = rand % get()
     if( r1 > p_del ) then ! Prompt emission
-      E_out = self % eLawPrompt % sample(E_in, rand)
-      if(present(lambda)) lambda = huge(lambda)
+      call self % samplePrompt(E_out, E_in, rand)
+      ! Set precursor parameters to -1.0 (non-physical dummy value)
+      if(present(lambda)) lambda(:) = -ONE
+      if(present(fd_i)) fd_i(:) = -ONE
 
     else ! Delayed emission
-      r2 = rand % get()
-
-      ! Loop over precursor groups
-      precursors: do i=1,size(self % delayed)
-        r2 = r2 - self % delayed(i) % prob % at(E_in)
-        if( r2 < ZERO) then
-          E_out = self % delayed(i) % eLaw % sample(E_in, rand)
-          if(present(lambda)) lambda = self % delayed(i) % lambda
-          return
-
-        end if
-      end do precursors
-
-      ! Sampling failed -> Choose top precursor group
-      N = size(self % delayed)
-      E_out = self % delayed(N) % eLaw % sample(E_in, rand)
-      if(present(lambda)) lambda = self % delayed(N) % lambda
-
+      call self % sampleDelayed(E_out, E_in, rand, p_del, temp_lambda, temp_fd_i)
+      if(present(lambda)) lambda = temp_lambda
+      if(present(fd_i)) fd_i = temp_fd_i
     end if
   end subroutine sampleOut
 
@@ -285,7 +329,7 @@ contains
 
     if(abs(mu) <= ONE .and. E_out > ZERO .and. phi <= TWO_PI .and. phi >= ZERO) then
 
-      ! Set delayed robability
+      ! Set delayed probability
       if (allocated(self % delayed)) then
         p_delayed = self % releaseDelayed(E_in) / self % release(E_in)
       else
@@ -367,9 +411,11 @@ contains
 
       ! Read Precursor data
       call ACE % setToPrecursors()
+      !print *, '--------'
       do i=1,size(self % delayed)
         ! Read delay constant
-        self % delayed(i) % lambda = ACE % readReal()
+        self % delayed(i) % lambda = ACE % readReal() / shake
+        !print *, 'lambda ACE: ', numToChar(self % delayed(i) % lambda)
         nr = ACE % readInt()
 
         if(nr < 0) call fatalError(Here, 'NR < 0. WTF?')
