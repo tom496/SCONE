@@ -2,6 +2,7 @@ module neutronCEtime_class
 
   use numPrecision
   use endfConstants
+  use universalVariables,            only : precursorGroups
   use genericProcedures,             only : fatalError, rotateVector, numToChar
   use dictionary_class,              only : dictionary
   use RNG_class,                     only : RNG
@@ -54,6 +55,7 @@ module neutronCEtime_class
   !!  impGen  -> are fission sites generated implicitly? (on by default)
   !!  branchless -> are fissions simulated without creating new neutrons? (off by default)
   !!  precursorsUsed -> are precursor particles created? (on by default)
+  !!  groupedPrecursor -> are all precursors grouped into a single particle (on by default)
   !!  splitting -> splits particles above certain weight (on by default)
   !!  roulette  -> roulettes particles below certain weight (off by defautl)
   !!  thresh_E -> Energy threshold for explicit treatment of target nuclide movement [-].
@@ -64,7 +66,7 @@ module neutronCEtime_class
   !!
   !! Sample dictionary input:
   !!   collProcName {
-  !!   type             neutronCEimp;
+  !!   type             neutronCEtime;
   !!   #minEnergy       <real>;#
   !!   #maxEnergy       <real>;#
   !!   #energyThreshold <real>;#
@@ -102,6 +104,7 @@ module neutronCEtime_class
     
     ! Precursors
     logical(defBool) :: usePrecursors
+    logical(defBool) :: groupedPrecursor
 
   contains
     ! Initialisation procedure
@@ -134,12 +137,12 @@ contains
   subroutine init(self, dict)
     class(neutronCEtime), intent(inout):: self
     class(dictionary), intent(in)      :: dict
-    character(100), parameter :: Here = 'init (neutronCEimp_class.f90)'
+    character(100), parameter :: Here = 'init (neutronCEtime_class.f90)'
 
     ! Call superclass
     call init_super(self, dict)
 
-    ! Read settings for neutronCEimp
+    ! Read settings for neutronCEtime
     ! Maximum and minimum energy
     call dict % getOrDefault(self % minE,'minEnergy',1.0E-11_defReal)
     call dict % getOrDefault(self % maxE,'maxEnergy',20.0_defReal)
@@ -158,7 +161,9 @@ contains
     call dict % getOrDefault(self % implicitSites,'impGen', .true.)
     call dict % getOrDefault(self % branchlessFiss, 'branchless', .false.)
     
+    ! Obtain precursor settings
     call dict % getOrDefault(self % usePrecursors, 'precursors', .true.)
+    call dict % getOrDefault(self % groupedPrecursor, 'groupedPrecursor', .true.)
 
     ! Verify settings
     if( self % minE < ZERO ) call fatalError(Here,'-ve minEnergy')
@@ -191,7 +196,7 @@ contains
     class(particleDungeon),intent(inout) :: nextCycle
     type(neutronMicroXSs)                :: microXSs
     real(defReal)                        :: r
-    character(100),parameter :: Here = 'sampleCollision (neutronCEimp_class.f90)'
+    character(100),parameter :: Here = 'sampleCollision (neutronCEtime_class.f90)'
 
     ! Verify that particle is CE neutron
     if(p % isMG .or. p % type /= P_NEUTRON) then
@@ -223,21 +228,23 @@ contains
   !! Perform implicit treatment
   !!
   subroutine implicit(self, p, collDat, thisCycle, nextCycle)
-    class(neutronCEtime), intent(inout)  :: self
-    class(particle), intent(inout)       :: p
-    type(collisionData), intent(inout)   :: collDat
-    class(particleDungeon),intent(inout) :: thisCycle
-    class(particleDungeon),intent(inout) :: nextCycle
-    type(fissionCE), pointer             :: fission
-    type(neutronMicroXSs)                :: microXSs
-    type(particleState)                  :: pTemp
-    real(defReal),dimension(3)           :: r, dir
-    integer(shortInt)                    :: n, i
-    real(defReal)                        :: wgt, w0, rand1, E_out, mu, phi
-    real(defReal)                        :: sig_nufiss, sig_tot, k_eff, &
-                                            sig_scatter, totalElastic
-    logical(defBool)                     :: fiss_and_implicit
-    character(100),parameter             :: Here = 'implicit (neutronCEimp_class.f90)'
+    class(neutronCEtime), intent(inout)      :: self
+    class(particle), intent(inout)           :: p
+    type(collisionData), intent(inout)       :: collDat
+    class(particleDungeon),intent(inout)     :: thisCycle
+    class(particleDungeon),intent(inout)     :: nextCycle
+    type(fissionCE), pointer                 :: fission
+    type(neutronMicroXSs)                    :: microXSs
+    type(particleState)                      :: pTemp
+    real(defReal),dimension(3)               :: r, dir
+    integer(shortInt)                        :: n, i, j
+    real(defReal)                            :: wgt, w0, rand1, E_out, mu, phi
+    real(defReal)                            :: sig_nufiss, sig_tot, k_eff, &
+                                                    sig_scatter, totalElastic
+    real(defReal)                            :: lambda, p_del
+    real(defReal),dimension(precursorGroups) :: lambda_i, fd_i, E_out_i
+    logical(defBool)                         :: fiss_and_implicit
+    character(100),parameter                 :: Here = 'implicit (neutronCEtime_class.f90)'
 
     ! Generate fission sites if nuclide is fissile
     fiss_and_implicit = self % nuc % isFissile() .and. self % implicitSites
@@ -251,7 +258,7 @@ contains
       call self % nuc % getMicroXSs(microXSs, p % E, p % pRNG)
       sig_nufiss = microXSs % nuFission
       sig_tot    = microXSs % total
-
+  
       ! Sample number of fission sites generated
       ! Support -ve weight particles
       n = int(abs( (wgt * sig_nufiss) / (sig_tot * k_eff)) + rand1, shortInt)
@@ -266,24 +273,65 @@ contains
       ! Store new sites in the next cycle dungeon
       wgt =  sign(w0, wgt)
       r   = p % rGlobal()
+      if (self % usePrecursors) then ! If generating precursor particles
+          do i=1,n
+            if (self % groupedPrecursor) then
+                call fission % sampleDelayedGrouped(mu, phi, E_out_i, p % E, p % pRNG, lambda_i, fd_i, p_del)
+            else
+                call fission % sampleDelayed(mu, phi, E_out, p % E, p % pRNG, lambda, p_del)
+                
+                ! Form arrays from single values
+                E_out_i(1) = E_out
+                E_out_i(2:) = ZERO
+                lambda_i(1) = lambda
+                lambda_i(2:) = ZERO
+                fd_i(1) = ONE
+                fd_i(2:) = ZERO
+            endif
+            
+            dir = rotateVector(p % dirGlobal(), mu, phi)
 
-      do i=1,n
-        call fission % sampleOut(mu, phi, E_out, p % E, p % pRNG)
-        dir = rotateVector(p % dirGlobal(), mu, phi)
+            do j=1, precursorGroups
+                if (E_out_i(i) > self % maxE) E_out_i(i) = self % maxE
+            end do
+            
+            ! Create precursor particle
+            ! Copy extra detail from parent particle (i.e. time, flags ect.)
+            pTemp       = p
 
-        if (E_out > self % maxE) E_out = self % maxE
+            ! Overwrite position, direction, and weight
+            pTemp % r   = r
+            pTemp % dir = dir
+            pTemp % wgt = wgt * p_del
+            
+            ! Precursor properties
+            pTemp % type = 3_shortInt
+            pTemp % lambda_i = lambda_i
+            pTemp % E_out_i = E_out_i
+            pTemp % fd_i = fd_i
 
-        ! Copy extra detail from parent particle (i.e. time, flags ect.)
-        pTemp       = p
+            ! Detain in particle dungeon
+            call thisCycle % detain(pTemp)
+          end do
+      else ! If not generating precursor particles
+          do i=1,n
+            call fission % sampleOut(mu, phi, E_out, p % E, p % pRNG)
+            dir = rotateVector(p % dirGlobal(), mu, phi)
 
-        ! Overwrite position, direction, energy and weight
-        pTemp % r   = r
-        pTemp % dir = dir
-        pTemp % E   = E_out
-        pTemp % wgt = wgt
+            if (E_out > self % maxE) E_out = self % maxE
 
-        call nextCycle % detain(pTemp)
-      end do
+            ! Copy extra detail from parent particle (i.e. time, flags ect.)
+            pTemp       = p
+
+            ! Overwrite position, direction, energy and weight
+            pTemp % r   = r
+            pTemp % dir = dir
+            pTemp % E   = E_out
+            pTemp % wgt = wgt
+
+            call nextCycle % detain(pTemp)
+          end do
+      end if
     end if
 
     ! Perform implicit absorption
@@ -335,85 +383,46 @@ contains
     class(particleDungeon),intent(inout) :: nextCycle
     type(neutronMicroXSs)                :: microXSs
     type(fissionCE), pointer             :: fiss
-    type(particleState)                  :: pTemp, precursor
+    type(particleState)                  :: pTemp
     real(defReal),dimension(3)           :: r, dir
     integer(shortInt)                    :: n, i
-    real(defReal)                        :: wgt, w0, rand1, E_out, mu, phi, nu
+    real(defReal)                        :: wgt, w0, rand1, E_out, mu, phi, nu, p_del
     real(defReal)                        :: sig_nufiss, sig_fiss, k_eff
-    real(defReal)                        :: lambda_i, fd_i
-    character(100),parameter             :: Here = 'fission (neutronCEimp_class.f90)'
+    character(100),parameter             :: Here = 'fission (neutronCEtime_class.f90)'
 
-    if (.not.self % implicitSites) then
     
-      ! Obtain required data
-      wgt   = p % w                ! Current weight
-      w0    = p % preHistory % wgt ! Starting weight
-      k_eff = p % k_eff            ! k_eff for normalisation
-      rand1 = p % pRNG % get()     ! Random number to sample sites
+    ! Obtain required data
+    wgt   = p % w                ! Current weight
+    w0    = p % preHistory % wgt ! Starting weight
+    k_eff = p % k_eff            ! k_eff for normalisation
+    rand1 = p % pRNG % get()     ! Random number to sample sites
 
-      call self % nuc % getMicroXSs(microXSs, p % E, p % pRNG)
-      sig_nufiss = microXSs % nuFission
-      sig_fiss   = microXSs % fission
+    call self % nuc % getMicroXSs(microXSs, p % E, p % pRNG)
+    sig_nufiss = microXSs % nuFission
+    sig_fiss   = microXSs % fission
 
-      ! Get fission Reaction
-      fiss => fissionCE_TptrCast(self % xsData % getReaction(N_FISSION, collDat % nucIdx))
-      if(.not.associated(fiss)) call fatalError(Here, "Failed to get fissionCE")
+    ! Get fission Reaction
+    fiss => fissionCE_TptrCast(self % xsData % getReaction(N_FISSION, collDat % nucIdx))
+    if(.not.associated(fiss)) call fatalError(Here, "Failed to get fissionCE")
 
-      if (self % branchlessFiss) then
+    if (self % branchlessFiss) then
         ! Calculate value of nu to adjust particle weight by
         nu = abs((sig_nufiss) / (sig_fiss * k_eff))
-        
+    
         r = p % rGlobal()
-        
-        ! If simulating precursor particles
-        if(self % usePrecursors) then
-            call fiss % sampleOut(mu, phi, E_out, p % E, p % pRNG, lambda_i, fd_i)
-
-            if (E_out > self % maxE) E_out = self % maxE
-            
-            ! If delayed neutron sampled
-            if (lambda_i > ZERO) then
-                ! Create precursor particle
-                ! Has most of the same parameters that the delayed neutron will have
-                dir = rotateVector(p % dirGlobal(), mu, phi)
-                precursor = p
-                
-                ! Delayed neutron parameters
-                precursor % r   = r
-                precursor % dir = dir
-                precursor % E   = E_out
-                
-                ! Precursor parameters
-                precursor % type = 3_shortInt
-                precursor % wgt = nu * p % w ! Check this
-                precursor % lambda_i = lambda_i
-                precursor % fd_i = fd_i
-                
-                ! Detain precursor
-                call thisCycle % detain(precursor)
-            ! If prompt neutron sampled
-            else
-                call p % rotate(mu, phi)
-                p % E = E_out
-                p % w = nu * p % w
-            endif
-        ! If not sampling precursors
-        else
-            call fiss % sampleOut(mu, phi, E_out, p % E, p % pRNG)
-        
-            if (E_out > self % maxE) E_out = self % maxE
-            call p % rotate(mu, phi)
-            p % E = E_out
-            p % w = nu * p % w
-        endif
-        
-      ! If not branchless
-      else
+        call fiss % samplePrompt(mu, phi, E_out, p % E, p % pRNG, p_del)
+    
+        if (E_out > self % maxE) E_out = self % maxE
+    
+        call p % rotate(mu, phi)
+        p % E = E_out
+        p % w = nu * p % w * (ONE - p_del)
+    else
         ! Sample number of fission sites generated
         ! Support -ve weight particles
         ! Note change of denominator (sig_fiss) wrt implicit generation
-        n = int(abs( (wgt * sig_nufiss) / (sig_fiss * k_eff)) + rand1, shortInt)
-        !n = int(abs( (wgt * sig_nufiss) / (sig_fiss * k_eff * w0)) + rand1, shortInt)
+        !n = int(abs( (wgt * sig_nufiss) / (sig_fiss * k_eff)) + rand1, shortInt)
+        n = int(abs( (wgt * sig_nufiss) / (sig_fiss * k_eff * w0)) + rand1, shortInt)
 
         ! Shortcut particle generation if no particles were sampled
         if (n < 1) return
@@ -421,72 +430,24 @@ contains
         ! Store new sites in the next cycle dungeon
         wgt =  sign(w0, wgt)
         r   = p % rGlobal()
-        
-        ! If using precursors
-        if (self % usePrecursors) then
-            do i=1,n
-              call fiss % sampleOut(mu, phi, E_out, p % E, p % pRNG, lambda_i, fd_i)
-              dir = rotateVector(p % dirGlobal(), mu, phi)
-
-              if (E_out > self % maxE) E_out = self % maxE
-              
-
-              ! If delayed neutron sampled
-              if (lambda_i > ZERO) then
-                ! Create precursor particle
-                ! Has most of the same parameters that the delayed neutron will have
-                precursor = p
-                
-                ! Delayed neutron parameters
-                precursor % r   = r
-                precursor % dir = dir
-                precursor % E   = E_out
-                
-                ! Precursor parameters
-                precursor % type = 3_shortInt
-                precursor % wgt = ONE
-                precursor % lambda_i = lambda_i
-                precursor % fd_i = fd_i
-                
-                ! Detain precursor
-                call thisCycle % detain(precursor)
-                
-              ! If prompt neutron sampled
-              else
-                ! Copy extra detail from parent particle (i.e. time, flags ect.)
-                pTemp       = p
-
-                ! Overwrite position, direction, energy and weight
-                pTemp % r   = r
-                pTemp % dir = dir
-                pTemp % E   = E_out
-                pTemp % wgt = ONE
-
-                call nextCycle % detain(pTemp)
-
-              end if
-            end do
-        ! If not simulating precursors
-        else
-            do i=1,n
-              call fiss % sampleOut(mu, phi, E_out, p % E, p % pRNG)
-              dir = rotateVector(p % dirGlobal(), mu, phi)
-              
-              if (E_out > self % maxE) E_out = self % maxE
-              
-              ! Copy extra detail from parent particle (i.e. time, flags ect.)
-              pTemp       = p
+    
+        do i=1,n
+            call fiss % samplePrompt(mu, phi, E_out, p % E, p % pRNG, p_del)
+            dir = rotateVector(p % dirGlobal(), mu, phi)
+      
+            if (E_out > self % maxE) E_out = self % maxE
+      
+            ! Copy extra detail from parent particle (i.e. time, flags ect.)
+            pTemp       = p
 
               ! Overwrite position, direction, energy and weight
               pTemp % r   = r
               pTemp % dir = dir
               pTemp % E   = E_out
-              pTemp % wgt = ONE
+              pTemp % wgt = wgt * (ONE - p_del)
               
               call nextCycle % detain(pTemp)
-            end do
-        end if
-      end if
+        end do
     end if
 
     if (.not. self % branchlessFiss) p % isDead =.true.
@@ -506,7 +467,7 @@ contains
     class(particleDungeon),intent(inout)   :: nextCycle
     class(uncorrelatedReactionCE), pointer :: reac
     logical(defBool)                       :: isFixed
-    character(100),parameter :: Here = 'elastic (neutronCEimp_class.f90)'
+    character(100),parameter :: Here = 'elastic (neutronCEtime_class.f90)'
 
     ! Get reaction
     reac => uncorrelatedReactionCE_CptrCast( self % xsData % getReaction(collDat % MT, collDat % nucIdx))
@@ -539,7 +500,7 @@ contains
     class(particleDungeon),intent(inout)   :: thisCycle
     class(particleDungeon),intent(inout)   :: nextCycle
     class(uncorrelatedReactionCE), pointer :: reac
-    character(100),parameter  :: Here =' inelastic (neutronCEimp_class.f90)'
+    character(100),parameter  :: Here =' inelastic (neutronCEtime_class.f90)'
 
     ! Invert inelastic scattering and Get reaction
     collDat % MT = self % nuc % invertInelastic(p % E, p % pRNG)

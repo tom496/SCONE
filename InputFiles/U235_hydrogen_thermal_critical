@@ -1,7 +1,7 @@
 type timeDependentPhysicsPackage; 
 
-pop      500;
-timeSteps   50;
+pop      1000;
+timeSteps   2000;
 XSdata   ce;
 dataType ce; 
 timeStepLength 1.E-1;
@@ -9,7 +9,7 @@ buffer 100;
 combing 1;
 precursors 1;
 
-collisionOperator { neutronCE {type neutronCEtime; impGen 0; branchless 0;} } 
+collisionOperator { neutronCE {type neutronCEtime; branchless 0;} } 
 
 transportOperator { type transportOperatorDT;
                   } 

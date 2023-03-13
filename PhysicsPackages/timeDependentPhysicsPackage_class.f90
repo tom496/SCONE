@@ -141,7 +141,7 @@ contains
     real(defReal), intent(in)                       :: step_T
     integer(shortInt), dimension(N_timeSteps)       :: stepPopArray, stepPrecursorArray
     real(defReal), dimension(N_timeSteps)           :: stepWeightArray, stepPrecursorWeightArray
-    character(100),parameter :: Here ='time steps (timeDependentPhysicsPackage_class.f90)'
+    character(100),parameter :: Here ='timeSteps (timeDependentPhysicsPackage_class.f90)'
     !$omp threadprivate(p, buffer, collOp, transOp, pRNG)
 
     !$omp parallel
@@ -188,13 +188,13 @@ contains
             
             ! Weight adjustment
             ! CHECK THIS: should be adjusting by delayed fraction? -- no, think this is correct
-            w_d = p_Precursor % w * step_T * p_Precursor % lambda_i *&
-                    exp(-p_precursor % lambda_i * (decay_T - p_Precursor % time))
+            w_d = p_Precursor % getPrecWeight(decay_T)
                     
             ! Update parameters
             p_Precursor % type = P_NEUTRON
             p_Precursor % time = decay_T
             p_Precursor % w = w_d
+            p_Precursor % E = p_Precursor % getDelayedEnergy(decay_T)
             
             p_Precursor % lambda_i = -ONE
             p_Precursor % fd_i = -ONE
@@ -311,7 +311,13 @@ contains
       endif
       
       ! Precursor population control
-      
+      if (self % precursorDungeon % popSize() > self % pop) then
+          print *, 'Precursor pop before norm:          ', self % precursorDungeon % popSize()
+          print *, 'Precursor timed weight before norm: ', self % precursorDungeon % totalTimedWeight(step_T * i)
+          call self % precursorDungeon % precursorCombing(self % pop, pRNG, step_T * i)
+          print *, 'Precursor pop after norm:           ', self % precursorDungeon % popSize()
+          print *, 'Precursor timed weight after norm:  ', self % precursorDungeon % totalTimedWeight(step_T * i)
+      end if
 
       ! Add to array of weight
       stepWeightArray(i) = self % nextTimeStep % popWeight()

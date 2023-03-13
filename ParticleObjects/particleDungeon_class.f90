@@ -601,8 +601,8 @@ contains
     do i=1, N
       ! Iterate over current precursor
       ! until a tooth falls within bounds of timed weight
-      do while (curTimedWeight + wTimedArray(i) < nextTooth)
-        curTimedWeight = curTimedWeight + wTimedArray(i)
+      do while (curTimedWeight + wTimedArray(j) < nextTooth)
+        curTimedWeight = curTimedWeight + wTimedArray(j)
         j = j + 1
       end do
       
@@ -610,6 +610,14 @@ contains
       newPrecursors(i) = self % prisoners(j)      ! Add to new array
       newPrecursors(i) % wgt = w_av / T_kArray(j) ! Update weight from timed weight
       nextTooth = nextTooth + w_av                ! Update position of tooth
+    end do
+    
+    ! Re-size the dungeon to new size
+    call self % setSize(N)
+    
+    ! Replace the particle at each index with the new particles
+    do i=1, N
+      call self % replace_particleState(newPrecursors(i), i)
     end do
     
   end subroutine precursorCombing
