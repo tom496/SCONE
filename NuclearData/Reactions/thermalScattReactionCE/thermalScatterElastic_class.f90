@@ -2,7 +2,6 @@ module thermalScatterElastic_class
 
   use numPrecision
   use endfConstants
-  use universalVariables,           only : precursorGroups
   use genericProcedures,            only : fatalError, numToChar, binarySearch
   use RNG_class,                    only : RNG
   use dataDeck_inter,               only : dataDeck
@@ -165,16 +164,14 @@ contains
   !!
   !! See uncorrelatedReactionCE for details
   !!
-  subroutine sampleOut(self, mu, phi, E_out, E_in, rand, lambda, fd_i, precursorGroups)
+  subroutine sampleOut(self, mu, phi, E_out, E_in, rand, lambda)
     class(thElasticScatter), intent(in) :: self
     real(defReal), intent(out)               :: mu
     real(defReal), intent(out)               :: phi
     real(defReal), intent(out)               :: E_out
     real(defReal), intent(in)                :: E_in
     class(RNG), intent(inout)                :: rand
-    real(defReal), dimension(precursorGroups), intent(out), optional :: lambda
-    real(defReal), dimension(precursorGroups), intent(out), optional :: fd_i
-    logical(defBool), intent(in), optional :: groupedPrecursors
+    real(defReal), intent(out), optional     :: lambda
     real(defReal), dimension(:), allocatable :: prob
     real(defReal)        :: E1, E2, f, mu_l1k, mu1, mu2, mu3, muLeft, muRight, r
     integer(shortInt)    :: l1, l2, k, i
@@ -262,9 +259,8 @@ contains
     ! Sample phi
     phi = rand % get() * TWO_PI
 
-    ! Only prompt particles. Set delayed parameters to non-physical values
-    if(present(lambda)) lambda(:) = -ONE
-    if(present(fd_i)) fd_i(:) = -ONE
+    ! Only prompt particles. Set delay
+    if(present(lambda)) lambda = huge(lambda)
 
   end subroutine sampleOut
 

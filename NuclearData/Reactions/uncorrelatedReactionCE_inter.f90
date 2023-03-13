@@ -1,7 +1,6 @@
 module uncorrelatedReactionCE_inter
 
   use numPrecision
-  use universalVariables,   only : precursorGroups
   use RNG_class,            only : RNG
   use reactionHandle_inter, only : reactionHandle
 
@@ -136,7 +135,7 @@ module uncorrelatedReactionCE_inter
     !! Errors:
     !!   If E_in is out of bounds or invalid (e.g.-ve) fatalError is returned
     !!
-    subroutine sampleOut(self, mu, phi, E_out, E_in, rand, lambda, fd_i, groupedPrecursors)
+    subroutine sampleOut(self, mu, phi, E_out, E_in, rand, lambda)
       import :: defReal, uncorrelatedReactionCE, RNG
       class(uncorrelatedReactionCE), intent(in) :: self
       real(defReal), intent(out)                :: mu
@@ -144,9 +143,7 @@ module uncorrelatedReactionCE_inter
       real(defReal), intent(out)                :: E_out
       real(defReal), intent(in)                 :: E_in
       class(RNG), intent(inout)                 :: rand
-      real(defReal), dimension(precursorGroups), intent(out), optional :: lambda
-      real(defReal), dimension(precursorGroups), intent(out), optional :: fd_i
-      logical(defBool), intent(in), optional    :: groupedPrecursors
+      real(defReal), intent(out),optional       :: lambda
     end subroutine sampleOut
 
     !!

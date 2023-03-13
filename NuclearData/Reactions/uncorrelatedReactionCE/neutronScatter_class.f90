@@ -2,7 +2,6 @@ module neutronScatter_class
 
   use numPrecision
   use endfConstants
-  use universalVariables,           only : precursorGroups
   use genericProcedures,            only : fatalError, numToChar
   use RNG_class,                    only : RNG
   use dataDeck_inter,               only : dataDeck
@@ -191,16 +190,14 @@ contains
   !!
   !! See uncorrelatedReactionCE for details
   !!
-  subroutine sampleOut(self, mu, phi, E_out, E_in, rand, lambda, fd_i, groupedPrecursors)
+  subroutine sampleOut(self, mu, phi, E_out, E_in, rand, lambda)
     class(neutronScatter), intent(in) :: self
     real(defReal), intent(out)               :: mu
     real(defReal), intent(out)               :: phi
     real(defReal), intent(out)               :: E_out
     real(defReal), intent(in)                :: E_in
     class(RNG), intent(inout)                :: rand
-    real(defReal), dimension(precursorGroups), intent(out), optional :: lambda
-    real(defReal), dimension(precursorGroups), intent(out), optional :: fd_i
-    logical(defBool), intent(in), optional   :: groupedPrecursors
+    real(defReal), intent(out), optional     :: lambda
 
     ! Sample energy an angle
     if( self % correlated) then
@@ -215,9 +212,8 @@ contains
     ! Sample phi
     phi = rand % get() * TWO_PI
 
-    ! Only prompt particles. Set delayed parameters to non-physical values
-    if(present(lambda)) lambda(:) = -ONE
-    if(present(fd_i)) fd_i(:) = -ONE
+    ! Only prompt particles. Set delay
+    if(present(lambda)) lambda = huge(lambda)
 
   end subroutine sampleOut
 
