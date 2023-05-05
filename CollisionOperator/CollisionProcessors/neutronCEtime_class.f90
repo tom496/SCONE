@@ -277,6 +277,7 @@ contains
           do i=1,n
             if (self % groupedPrecursor) then
                 call fission % sampleDelayedGrouped(mu, phi, E_out_i, p % E, p % pRNG, lambda_i, fd_i, p_del)
+                !print *, numToChar(sum(fd_i(1:precursorGroups)))
             else
                 call fission % sampleDelayed(mu, phi, E_out, p % E, p % pRNG, lambda, p_del)
                 
@@ -404,50 +405,51 @@ contains
     ! Get fission Reaction
     fiss => fissionCE_TptrCast(self % xsData % getReaction(N_FISSION, collDat % nucIdx))
     if(.not.associated(fiss)) call fatalError(Here, "Failed to get fissionCE")
-
-    if (self % branchlessFiss) then
-        ! Calculate value of nu to adjust particle weight by
-        nu = abs((sig_nufiss) / (sig_fiss * k_eff))
-    
-        r = p % rGlobal()
-        call fiss % samplePrompt(mu, phi, E_out, p % E, p % pRNG, p_del)
-    
-        if (E_out > self % maxE) E_out = self % maxE
-    
-        call p % rotate(mu, phi)
-        p % E = E_out
-        p % w = nu * p % w * (ONE - p_del)
-    else
-        ! Sample number of fission sites generated
-        ! Support -ve weight particles
-        ! Note change of denominator (sig_fiss) wrt implicit generation
-        !n = int(abs( (wgt * sig_nufiss) / (sig_fiss * k_eff)) + rand1, shortInt)
-        n = int(abs( (wgt * sig_nufiss) / (sig_fiss * k_eff * w0)) + rand1, shortInt)
-
-        ! Shortcut particle generation if no particles were sampled
-        if (n < 1) return
-
-        ! Store new sites in the next cycle dungeon
-        wgt =  sign(w0, wgt)
-        r   = p % rGlobal()
-    
-        do i=1,n
+    if (self % usePrecursors) then
+        if (self % branchlessFiss) then
+            ! Calculate value of nu to adjust particle weight by
+            nu = abs((sig_nufiss) / (sig_fiss * k_eff))
+        
+            r = p % rGlobal()
             call fiss % samplePrompt(mu, phi, E_out, p % E, p % pRNG, p_del)
-            dir = rotateVector(p % dirGlobal(), mu, phi)
-      
+        
             if (E_out > self % maxE) E_out = self % maxE
-      
-            ! Copy extra detail from parent particle (i.e. time, flags ect.)
-            pTemp       = p
+        
+            call p % rotate(mu, phi)
+            p % E = E_out
+            p % w = nu * p % w * (ONE - p_del)
+        else
+            ! Sample number of fission sites generated
+            ! Support -ve weight particles
+            ! Note change of denominator (sig_fiss) wrt implicit generation
+            !n = int(abs( (wgt * sig_nufiss) / (sig_fiss * k_eff)) + rand1, shortInt)
+            n = int(abs( (wgt * sig_nufiss) / (sig_fiss * k_eff * w0)) + rand1, shortInt)
 
-              ! Overwrite position, direction, energy and weight
-              pTemp % r   = r
-              pTemp % dir = dir
-              pTemp % E   = E_out
-              pTemp % wgt = wgt * (ONE - p_del)
-              
-              call nextCycle % detain(pTemp)
-        end do
+            ! Shortcut particle generation if no particles were sampled
+            if (n < 1) return
+
+            ! Store new sites in the next cycle dungeon
+            wgt =  sign(w0, wgt)
+            r   = p % rGlobal()
+        
+            do i=1,n
+                call fiss % samplePrompt(mu, phi, E_out, p % E, p % pRNG, p_del)
+                dir = rotateVector(p % dirGlobal(), mu, phi)
+          
+                if (E_out > self % maxE) E_out = self % maxE
+          
+                ! Copy extra detail from parent particle (i.e. time, flags ect.)
+                pTemp       = p
+
+                  ! Overwrite position, direction, energy and weight
+                  pTemp % r   = r
+                  pTemp % dir = dir
+                  pTemp % E   = E_out
+                  pTemp % wgt = wgt * (ONE - p_del)
+                  
+                  call nextCycle % detain(pTemp)
+            end do
+        end if
     end if
 
     if (.not. self % branchlessFiss) p % isDead =.true.

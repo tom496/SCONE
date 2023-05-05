@@ -250,12 +250,8 @@ contains
             endif
 
             if(p % isDead) exit history
-
-            if(self % usePrecursors) then
-                call collOp % collide(p, tally, self % precursorDungeon, buffer)
-            else
-                call collOp % collide(p, tally, self % precursorDungeon, buffer)
-            endif
+            
+            call collOp % collide(p, tally, self % precursorDungeon, buffer)
             
             if(p % isDead) exit history
           end do history
@@ -373,6 +369,9 @@ contains
     end do
     
     print *, '-----------------------------------------------------------------'
+    print *, 'Final neutron/precursor timed weight'
+    print *, numToChar(stepWeightArray(N_timeSteps))
+    print *, numToChar(stepPrecursorWeightArray(N_timeSteps))
     
   end subroutine timeSteps
 

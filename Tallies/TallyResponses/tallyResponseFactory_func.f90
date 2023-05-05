@@ -13,6 +13,7 @@ module tallyResponseFactory_func
   use microResponse_class,    only : microResponse
   use weightResponse_class,   only : weightResponse
   use testResponse_class,     only : testResponse
+  use lifetimeResponse_class, only : lifetimeResponse
 
   implicit none
   private
@@ -24,10 +25,11 @@ module tallyResponseFactory_func
   ! It is printed if type was unrecognised
   ! NOTE:
   ! For now  it is necessary to adjust trailing blanks so all enteries have the same length
-  character(nameLen),dimension(*),parameter :: AVALIBLE_tallyResponses = ['fluxResponse  ',&
-                                                                          'macroResponse ',&
-                                                                          'microResponse ',&
-                                                                          'weightResponse']
+  character(nameLen),dimension(*),parameter :: AVALIBLE_tallyResponses = ['fluxResponse    ',&
+                                                                          'macroResponse   ',&
+                                                                          'microResponse   ',&
+                                                                          'weightResponse  ',&
+                                                                          'lifetimeResponse']
 
 contains
 
@@ -69,6 +71,10 @@ contains
 
       case('testResponse')
         allocate(testResponse :: new)
+        call new % init(dict)
+        
+      case('lifetimeResponse')
+        allocate(lifetimeResponse :: new)
         call new % init(dict)
 
      !*** NEW TALLY MAP TEMPLATE ***!

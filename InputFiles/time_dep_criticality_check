@@ -1,0 +1,77 @@
+type eigenPhysicsPackage; 
+
+pop      15000;
+active   200; 
+inactive 100; 
+XSdata   ce;
+dataType ce; 
+
+collisionOperator { neutronCE {type neutronCEstd;} 
+                    neutronMG {type neutronMGstd;} 
+                  } 
+
+transportOperator { type transportOperatorDT;
+                  } 
+
+inactiveTally {
+              } 
+
+activeTally  {  
+                norm    fiss; 
+                normVal 100;
+                fiss { type collisionClerk; response (fiss); fiss {type macroResponse; MT -6;}}
+                flux { type collisionClerk; 
+                       map { type energyMap; grid log; min 0.001; max 20; N 300;} 
+                       response (flux); flux {type fluxResponse;}
+                     } 
+                lifetime { type collisionClerk; response (lifetime);
+                           lifetime {type lifetimeResponse;}
+                         }
+	      }
+
+geometry { 
+    type geometryStd;
+    boundary (1 1 1 1 1 1);
+    graph {type shrunk;}
+
+    surfaces
+    {
+      squareBound { id 1; type box; origin ( 0.0  0.0  0.0); halfwidth (10.0 10.0 10.0); }  
+    }
+
+
+    cells
+    {
+    }
+
+    universes
+    {
+
+      root
+      {
+	  id 1;
+	  type rootUniverse; 
+	  border 1;
+	  fill hydrogen_with_uranium; 
+      }
+    }   
+}
+
+nuclearData {
+  handles {
+    ce { type aceNeutronDatabase; aceLibrary /home/tom13/SCONE/SCONE/fullLib.xsfile;} }
+  materials {
+ 
+    hydrogen_with_uranium {
+      temp 12345;
+      composition {
+      1001.03    2.01892E-02;
+      92235.03   9.3472E-06;	  }
+      }
+
+} 
+  
+}
+  
+  
+  

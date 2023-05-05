@@ -320,12 +320,14 @@ contains
     
     ! Calculate delayed neutron probability
     p_del = self % releaseDelayed(E_in) / self % release(E_in)
+    !print *, "p_del", numToChar(p_del)
   
     ! Create arrays of precursor properties
     precursors: do i=1,size(self % delayed)
         E_out_i(i) = self % delayed(i) % eLaw % sample(E_in, rand)
         lambda_i(i) = self % delayed(i) % lambda
-        fd_i(i) = self % delayed(i) % prob % at(E_in) / p_del
+        fd_i(i) = self % delayed(i) % prob % at(E_in)
+        !print *, numToChar(lambda_i(i)), numToChar(fd_i(i))
     end do precursors
   
   end subroutine sampleDelayedGrouped
