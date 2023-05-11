@@ -1,4 +1,4 @@
-module lifetimeResponse_class
+module populationResponse_class
 
   use numPrecision
   use dictionary_class,    only : dictionary
@@ -12,20 +12,21 @@ module lifetimeResponse_class
   private
 
   !!
-  !! tallyResponse to score lifetime
+  !! tallyResponse to score population
+  !! needs to be divided by time step in post-processing
   !!
   !! Returns 1/particle speed
   !!
   !! Interface:
   !!   tallyResponse Interface
   !!
-  type, public,extends(tallyResponse) :: lifetimeResponse
+  type, public,extends(tallyResponse) :: populationResponse
     private
   contains
     procedure :: init
     procedure :: get
     procedure :: kill
-  end type lifetimeResponse
+  end type populationResponse
 
 contains
 
@@ -35,7 +36,7 @@ contains
   !! See tallyResponse_inter for details
   !!
   subroutine init(self, dict)
-    class(lifetimeResponse), intent(inout) :: self
+    class(populationResponse), intent(inout) :: self
     class(dictionary), intent(in)      :: dict
 
     ! Do nothing
@@ -48,7 +49,7 @@ contains
   !! See tallyResponse_inter for details
   !!
   function get(self, p, xsData) result(val)
-    class(lifetimeResponse), intent(in)       :: self
+    class(populationResponse), intent(in)       :: self
     class(particle), intent(in)           :: p
     class(nuclearDatabase), intent(inout) :: xsData
     real(defReal)                         :: val
@@ -61,10 +62,10 @@ contains
   !! Return to uninitialised State
   !!
   elemental subroutine kill(self)
-    class(lifetimeResponse), intent(inout) :: self
+    class(populationResponse), intent(inout) :: self
 
     ! Do nothing for nothing can be done
 
   end subroutine kill
 
-end module lifetimeResponse_class
+end module populationResponse_class

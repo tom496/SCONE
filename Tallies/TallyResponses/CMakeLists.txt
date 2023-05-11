@@ -7,7 +7,7 @@ add_sources(./tallyResponse_inter.f90
             ./microResponse_class.f90
             ./weightResponse_class.f90
             ./testResponse_class.f90
-            ./lifetimeResponse_class.f90
+            ./populationResponse_class.f90
             )
 
              

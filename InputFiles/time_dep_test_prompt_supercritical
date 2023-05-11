@@ -1,6 +1,6 @@
 type timeDependentPhysicsPackage; 
 
-pop      5000;
+pop      20000;
 timeSteps   200;
 XSdata   ce;
 dataType ce; 
@@ -26,13 +26,9 @@ tally  {
     map { type timeMap; grid lin; min 0.0; max 0.1; N 1000;}
     response (flux); flux {type fluxResponse;}
   }
-  weight_time0 { type collisionClerk;
-    map { type timeMap; grid lin; min 0.0; max 0.1; N 1000;}
-    response (flux); flux {type weightResponse; moment 0;}
-  }
-  weight_time1 { type collisionClerk;
-    map { type timeMap; grid lin; min 0.0; max 0.1; N 1000;}
-    response (flux); flux {type weightResponse; moment 1;}
+  population { type collisionClerk;
+    map { type timeMap; grid lin; min 0.0; max 2.0; N 2000;}
+    response (population); population {type populationResponse;}
   }
 }
 
@@ -72,8 +68,8 @@ nuclearData {
     hydrogen_with_uranium {
       temp 12345;
       composition {
-      1001.03    1.004E-02;
-      92235.03   9.3472E-06;	  }
+      1001.03    1.004E-05;
+      92235.03   9.3472E-09;	  }
       }
 
 } 
