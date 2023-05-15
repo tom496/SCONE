@@ -210,9 +210,9 @@ contains
     real(defReal),intent(in)                :: w
     real(defReal),optional,intent(in)       :: t
     integer(shortInt),intent(in),optional   :: type
-    real(defReal),optional,intent(in)       :: lambda_i
-    real(defReal),optional,intent(in)       :: fd_i
-    real(defReal),optional,intent(in)       :: E_out_i
+    real(defReal),dimension(precursorGroups),optional,intent(in) :: lambda_i
+    real(defReal),dimension(precursorGroups),optional,intent(in) :: fd_i
+    real(defReal),dimension(precursorGroups),optional,intent(in) :: E_out_i
 
 
     call self % coords % init(r, dir)
@@ -276,8 +276,8 @@ contains
     integer(shortInt),intent(in)            :: G
     real(defReal),intent(in),optional       :: t
     integer(shortInt),intent(in),optional   :: type
-    real(defReal),optional,intent(in)       :: lambda_i
-    real(defReal),optional,intent(in)       :: fd_i
+    real(defReal),dimension(precursorGroups),optional,intent(in) :: lambda_i
+    real(defReal),dimension(precursorGroups),optional,intent(in) :: fd_i
 
     call self % coords % init(r, dir)
     self % G  = G
@@ -515,10 +515,11 @@ contains
   end function getSpeed
   
   !!
-  !! Return neutron weight for decay at time t
+  !! Return neutron weight for forced decay at time t
   !!
   !! Args:
-  !!   t     -> time of weight calculation
+  !!   t       -> time of forced decay
+  !!   delta_T -> time step in which forced decay occurs
   !!
   !! Result:
   !!   Neutron weight for decay at time t
@@ -527,9 +528,10 @@ contains
   !! Errors:
   !!   
   !!
-  function getPrecWeight(self, t) result(w_d)
+  function getPrecWeight(self, t, delta_T) result(w_d)
     class(particle), intent(in) :: self
     real(defReal), intent(in)   :: t
+    real(defReal), intent(in)   :: delta_T
     integer(shortInt)           :: i
     real(defReal)               :: w_d
     
@@ -537,10 +539,11 @@ contains
     if (self % type == P_PRECURSOR) then
         ! Loop over precursor groups
         do i=1, precursorGroups
-            w_d = w_d + self % fd_i(i) * exp(-self % lambda_i(i) * (t - self % time))
+            w_d = w_d + self % fd_i(i) * self % lambda_i(i) *&
+                    exp(-self % lambda_i(i) * (t - self % time))
         end do
     end if
-    w_d = w_d * self % w
+    w_d = w_d * self % w * delta_T
   end function getPrecWeight
   
   !!
@@ -599,7 +602,7 @@ contains
     if (self % type == P_PRECURSOR) then
         ! Loop over precursor groups
         do i=1, precursorGroups
-            w_Timed = w_Timed + self % fd_i(i)* exp(-self % lambda_i(i) * (t - self % time))
+            w_Timed = w_Timed + self % fd_i(i) * exp(-self % lambda_i(i) * (t - self % time))
         end do 
         !print *, 'lambda_i:       ', numToChar(self % lambda_i)
         !print *
@@ -641,7 +644,9 @@ contains
         w_Prob = ZERO
         
         ! Create w_Prob by summing over all groups
+        !print *, "E_out_i"
         do i=1, precursorGroups
+            !print *, numToChar(self % E_out_i(i))
             w_Prob = w_Prob + self % fd_i(i) * self % lambda_i(i) *&
                                     exp(-self % lambda_i(i) * (t - self % time))
         end do

@@ -1,10 +1,10 @@
 type timeDependentPhysicsPackage; 
 
 pop      20000;
-timeSteps   2000;
+timeSteps   200;
 XSdata   ce;
 dataType ce; 
-timeStepLength 1.E-2;
+timeStepLength 1.E-1;
 buffer 1000;
 combing 1;
 precursors 1;
@@ -23,11 +23,11 @@ source {
 
 tally  {
   flux_time { type collisionClerk;
-    map { type timeMap; grid lin; min 0.0; max 0.1; N 1000;}
+    map { type timeMap; grid lin; min 0.0; max 20.0; N 200;}
     response (flux); flux {type fluxResponse;}
   }
   population { type collisionClerk;
-    map { type timeMap; grid lin; min 0.0; max 2.0; N 2000;}
+    map { type timeMap; grid lin; min 0.0; max 20.0; N 200;}
     response (population); population {type populationResponse;}
   }
 }

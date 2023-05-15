@@ -596,10 +596,10 @@ contains
     nextTooth = rand % get() * w_av
     
     j=1
-    curTimedWeight = ZERO
+    curTimedWeight = ZERO ! Running total of timed weight
     
     do i=1, N
-      ! Iterate over current precursor
+      ! Iterate over current precursors
       ! until a tooth falls within bounds of timed weight
       do while (curTimedWeight + wTimedArray(j) < nextTooth)
         curTimedWeight = curTimedWeight + wTimedArray(j)

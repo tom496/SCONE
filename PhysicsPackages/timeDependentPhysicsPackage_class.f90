@@ -188,13 +188,19 @@ contains
             
             ! Weight adjustment
             ! CHECK THIS: should be adjusting by delayed fraction? -- no, think this is correct
-            w_d = p_Precursor % getPrecWeight(decay_T)
+            w_d = p_Precursor % getPrecWeight(decay_T, step_T)
+            
+            pRNG = self % pRNG
+            p_Precursor % pRNG => pRNG
+            call p_Precursor % pRNG % stride(n)
                     
             ! Update parameters
+            p_Precursor % E = p_Precursor % getDelayedEnergy(decay_T)
             p_Precursor % type = P_NEUTRON
             p_Precursor % time = decay_T
             p_Precursor % w = w_d
-            p_Precursor % E = p_Precursor % getDelayedEnergy(decay_T)
+            !print *, 'precursor weight', numToChar(w_d)
+            !print *, numToChar(p_Precursor % E)
             
             p_Precursor % lambda_i = -ONE
             p_Precursor % fd_i = -ONE
@@ -203,6 +209,9 @@ contains
             call self % thisTimeStep % detain(p_Precursor)
           end do
       endif
+      
+      nParticles = self % thisTimeStep % popSize()
+      !print *, 'no of particles after forced decay', numToChar(nParticles)
 
       !$omp parallel do schedule(dynamic)
       gen: do n = 1, nParticles
@@ -275,7 +284,7 @@ contains
       call self % pRNG % stride(self % pop)
 
       ! Send end of cycle report
-      call tally % reportCycleEnd(self % thisTimeStep)
+      call tally % reportCycleEnd(self % nextTimeStep)
 
       if (self % useCombing) then
           !print *, 'START Next time pop:', numToChar(self % nextTimeStep % popSize())
@@ -340,7 +349,6 @@ contains
       end_T = real(N_timeSteps,defReal) * elapsed_T / i
       T_toEnd = max(ZERO, end_T - elapsed_T)
       
-      nParticles = self % thisTimeStep % popSize()
 
       ! Display progress
       call printFishLineR(i)
