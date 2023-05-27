@@ -89,6 +89,7 @@ module timeDependentPhysicsPackage_class
     type(particleDungeon), pointer :: temp_dungeon       => null()
     type(particleDungeon), pointer :: precursorDungeon   => null()
     class(source), allocatable     :: timeDependent
+    real(defReal), dimension(:), allocatable :: precursorWeights
 
     ! Timer bins
     integer(shortInt) :: timerMain
@@ -363,6 +364,9 @@ contains
       print *, 'Time to end:     ', trim(secToChar(T_toEnd))
       call tally % display()
     end do
+    
+    self % precursorWeights = stepPrecursorWeightArray
+    
     print *
     print *, '-----------------------------------------------------------------'
     do i = 1, N_timeSteps
@@ -390,6 +394,7 @@ contains
     class(timeDependentPhysicsPackage), intent(inout) :: self
     type(outputFile)                                :: out
     character(nameLen)                              :: name
+    integer(shortInt)                               :: i
 
     call out % init(self % outputFormat)
 
@@ -408,12 +413,23 @@ contains
 
     name = 'Transport_time'
     call out % printValue(timerTime(self % timerMain),name)
+    
+    ! Precursor pops array
+    name ='precursorWeights'
+    call out % startArray(name, [size(self % precursorWeights)])
+
+    ! Print results to the file
+    do i=1,size(self % precursorWeights)
+      call out % addResult(self % precursorWeights(i), ZERO)
+    end do
+
+    call out % endArray()
 
     ! Print tally
     call self % tally % print(out)
 
     call out % writeToFile(self % outputFile)
-
+    
   end subroutine collectResults
 
 

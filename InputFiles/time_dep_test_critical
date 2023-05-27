@@ -4,7 +4,7 @@ pop      20000;
 timeSteps   200;
 XSdata   ce;
 dataType ce; 
-timeStepLength 1.E-1;
+timeStepLength 0.1;
 buffer 1000;
 combing 1;
 precursors 1;
@@ -29,6 +29,9 @@ tally  {
   population { type collisionClerk;
     map { type timeMap; grid lin; min 0.0; max 20.0; N 200;}
     response (population); population {type populationResponse;}
+  }
+  population_total { type collisionClerk;
+    response (population_total); population_total {type populationResponse;}
   }
 }
 
